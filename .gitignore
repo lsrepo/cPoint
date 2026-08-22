@@ -5,7 +5,8 @@ yearly_top_tags.csv
 download_all_years.log
 
 # Article browser site (added to as the plan's tasks build it)
-articles.db
+# articles.db is intentionally tracked (checked in) — file-based DB, so the
+# repo/Docker image is self-contained without a separate bootstrap step.
 venv/
 __pycache__/
 *.pyc
