@@ -3,6 +3,29 @@
 A local website for browsing the am730 column archive: FastAPI + SQLite
 backend, React frontend.
 
+## Features
+
+- **Browse by date** — articles grouped by year (most recent expanded by
+  default), newest first.
+- **Browse by tag** — every hashtag the archive has, sorted by frequency,
+  with a live search-as-you-type filter over the tag list.
+- **Filter tags by year** — pick a year (or 全部年份 for all) on the tag
+  page to see only that year's tags and counts. The selected year carries
+  through when you click a tag, into the article list, and back again —
+  it doesn't reset partway through.
+- **Article view** — full text, source link, and clickable tags; article
+  body text is rendered 20% larger than the rest of the UI for readability.
+  The "back" link remembers where you came from (the date list, or a
+  specific — optionally year-scoped — tag).
+- **Dark mode** — a header toggle switches themes and remembers your
+  choice (`localStorage`); on a first visit with no saved preference it
+  follows the OS/browser's `prefers-color-scheme`.
+- **Incremental daily updates** — `sync_articles.py` fetches only articles
+  published since the last sync (stops at the first one it already has),
+  so keeping the archive current never means re-fetching everything.
+- **One-command Docker deployment** — see below; the container runs the
+  same incremental sync in the background on startup.
+
 ## Run with Docker
 
 The simplest way to run it — no local Python/Node setup needed:
