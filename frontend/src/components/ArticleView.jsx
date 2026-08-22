@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { getArticle } from "../api";
 
 export default function ArticleView() {
   const { nid } = useParams();
+  const location = useLocation();
+  const backTo = location.state?.from || "/date";
   const [article, setArticle] = useState(undefined);
   const [error, setError] = useState(null);
 
@@ -19,7 +21,7 @@ export default function ArticleView() {
 
   return (
     <>
-      <p><Link to="/date">&laquo; 返回文章列表</Link></p>
+      <p><Link to={backTo}>&laquo; 返回文章列表</Link></p>
       <h1>{article.title}</h1>
       <p className="meta">
         {article.date} ·{" "}

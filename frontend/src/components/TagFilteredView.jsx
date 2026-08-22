@@ -16,6 +16,8 @@ export default function TagFilteredView() {
   if (error) return <p>載入失敗，請稍後再試。</p>;
   if (articles === null) return <p>載入中...</p>;
 
+  const backTo = `/tag/${encodeURIComponent(tag)}`;
+
   return (
     <>
       <h1>標籤：{tag}（{articles.length} 篇）</h1>
@@ -23,7 +25,7 @@ export default function TagFilteredView() {
       <ul>
         {articles.map((a) => (
           <li key={a.nid}>
-            <Link to={`/article/${a.nid}`}>{a.date} — {a.title}</Link>
+            <Link to={`/article/${a.nid}`} state={{ from: backTo }}>{a.date} — {a.title}</Link>
           </li>
         ))}
       </ul>
