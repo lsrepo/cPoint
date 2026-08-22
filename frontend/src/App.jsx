@@ -5,10 +5,6 @@ import TagListView from "./components/TagListView";
 import TagFilteredView from "./components/TagFilteredView";
 import ArticleView from "./components/ArticleView";
 
-function Placeholder() {
-  return <p>此檢視尚未實作。</p>;
-}
-
 export default function App() {
   return (
     <HashRouter>

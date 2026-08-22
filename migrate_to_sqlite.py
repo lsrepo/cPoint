@@ -41,6 +41,22 @@ def main():
     bodies = load_local_bodies(root_dir)
     print(f"Found {len(bodies)} locally downloaded article bodies.")
 
+    if len(bodies) == 0:
+        print(
+            "No local articles_<year>/*.txt files were found under "
+            f"{root_dir!r}.\n"
+            "This script expects the original downloader's output "
+            "directories (articles_<year>/) to already exist on disk — it "
+            "does not download article bodies itself, only hashtag "
+            "metadata from the listing API.\n"
+            "If you're starting from a fresh clone with no prior scrape, "
+            "run `python3 sync_articles.py` instead: it will walk the "
+            "full archive from empty (slower, since it fetches every "
+            "article body over the network) but is self-contained and "
+            "doesn't require the local text files."
+        )
+        sys.exit(1)
+
     conn = db.connect(os.path.join(root_dir, db.DB_PATH))
     page, next_key, next_date = 1, "", ""
     imported, skipped = 0, 0

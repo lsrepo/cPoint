@@ -5,12 +5,15 @@ import { getArticles } from "../api";
 export default function TagFilteredView() {
   const { tag } = useParams();
   const [articles, setArticles] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     setArticles(null);
-    getArticles(tag).then(setArticles);
+    setError(null);
+    getArticles(tag).then(setArticles).catch((err) => setError(err.message));
   }, [tag]);
 
+  if (error) return <p>載入失敗，請稍後再試。</p>;
   if (articles === null) return <p>載入中...</p>;
 
   return (

@@ -5,12 +5,15 @@ import { getArticle } from "../api";
 export default function ArticleView() {
   const { nid } = useParams();
   const [article, setArticle] = useState(undefined);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     setArticle(undefined);
-    getArticle(nid).then(setArticle);
+    setError(null);
+    getArticle(nid).then(setArticle).catch((err) => setError(err.message));
   }, [nid]);
 
+  if (error) return <p>載入失敗，請稍後再試。</p>;
   if (article === undefined) return <p>載入中...</p>;
   if (article === null) return <p>找不到文章。</p>;
 

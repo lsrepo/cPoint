@@ -14,11 +14,13 @@ function groupByYear(articles) {
 
 export default function DateView() {
   const [articles, setArticles] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    getArticles().then(setArticles);
+    getArticles().then(setArticles).catch((err) => setError(err.message));
   }, []);
 
+  if (error) return <p>載入失敗，請稍後再試。</p>;
   if (articles === null) return <p>載入中...</p>;
 
   const groups = groupByYear(articles);

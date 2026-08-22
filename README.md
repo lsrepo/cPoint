@@ -20,6 +20,15 @@ npm run build
 cd ..
 ```
 
+`migrate_to_sqlite.py` is a one-time historical bootstrap: it requires the
+original downloader's output directories (`articles_<year>/*.txt`) to
+already exist locally, and only fetches hashtag metadata over the network
+— it does not download article bodies itself. If those directories don't
+exist (e.g. a fresh clone with no prior scrape), skip it and run
+`python3 sync_articles.py` instead — it walks the entire listing API from
+an empty database and populates `articles.db` directly. That's slower
+(it fetches every article body over the network) but self-contained.
+
 ## Run it
 
 ```bash
