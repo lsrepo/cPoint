@@ -771,7 +771,7 @@ if os.path.isdir(FRONTEND_DIST):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8420)
 ```
 
 - [ ] **Step 6: Run the check to confirm it passes**
@@ -798,7 +798,7 @@ git commit -m "feat: add FastAPI backend with JSON API"
 - Create: `frontend/src/api.js`
 
 **Interfaces:**
-- Consumes: nothing yet (routes render placeholders; Tasks 6–8 fill them in). The Vite dev proxy consumes `server.py` (Task 4) running on port 8000.
+- Consumes: nothing yet (routes render placeholders; Tasks 6–8 fill them in). The Vite dev proxy consumes `server.py` (Task 4) running on port 8420.
 - Produces: `getArticles(tag?)`, `getTags()`, `getArticle(nid)` in `frontend/src/api.js` — the only functions Tasks 6–8's components import for data fetching. Produces the `<Routes>` skeleton in `App.jsx` with paths `/date`, `/tags`, `/tag/:tag`, `/article/:nid` that Tasks 6–8 swap from `<Placeholder />` to real components.
 
 - [ ] **Step 1: Scaffold the project**
@@ -822,7 +822,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': 'http://localhost:8420',
     },
   },
 })
@@ -1319,7 +1319,7 @@ source venv/bin/activate   # if not already active
 python3 server.py
 \`\`\`
 
-Open <http://localhost:8000/>.
+Open <http://localhost:8420/>.
 
 ## Keeping it up to date
 
@@ -1342,7 +1342,7 @@ built version above:
 \`\`\`bash
 # terminal 1
 source venv/bin/activate
-uvicorn server:app --reload --port 8000
+uvicorn server:app --reload --port 8420
 
 # terminal 2
 cd frontend
@@ -1350,7 +1350,7 @@ npm run dev
 \`\`\`
 
 Open <http://localhost:5173/> — Vite proxies `/api/*` requests to the
-backend on port 8000. Re-run `npm run build` (Step 2 above) when you're
+backend on port 8420. Re-run `npm run build` (Step 2 above) when you're
 done, so `python3 server.py` alone serves the latest frontend again.
 ```
 
@@ -1371,7 +1371,7 @@ source venv/bin/activate
 python3 server.py
 ```
 
-Open `http://localhost:8000/` (no separate Vite process this time — confirming the `StaticFiles` mount serves the build from Step 2). Walk through: `#/date` → expand a past year → open an article → click one of its tags → confirm the filtered list is correct → open another article from there → "« 返回文章列表". Stop the server after checking.
+Open `http://localhost:8420/` (no separate Vite process this time — confirming the `StaticFiles` mount serves the build from Step 2). Walk through: `#/date` → expand a past year → open an article → click one of its tags → confirm the filtered list is correct → open another article from there → "« 返回文章列表". Stop the server after checking.
 
 - [ ] **Step 6: Commit**
 
