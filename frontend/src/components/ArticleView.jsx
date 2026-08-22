@@ -32,9 +32,11 @@ export default function ArticleView() {
           <Link key={t} className="tag" to={`/tag/${encodeURIComponent(t)}`}>{t}</Link>
         ))}
       </p>
-      {article.body.split("\n\n").map((para, i) => (
-        <p key={i}>{para}</p>
-      ))}
+      <div className="article-body">
+        {article.body.split("\n\n").map((para, i) => (
+          <p key={i}>{para}</p>
+        ))}
+      </div>
     </>
   );
 }

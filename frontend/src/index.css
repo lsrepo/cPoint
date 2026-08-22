@@ -4,6 +4,19 @@
   --accent: #2350a9;
   --muted: #666;
   --border: #ddd;
+  --surface: #fff;
+  --tag-bg: #eef2fb;
+  --tag-bg-hover: #dde6f8;
+}
+:root[data-theme="dark"] {
+  --bg: #14181f;
+  --fg: #e6e6e6;
+  --accent: #6ea8ff;
+  --muted: #9aa4b2;
+  --border: #333a45;
+  --surface: #1c2129;
+  --tag-bg: #1f2937;
+  --tag-bg-hover: #26313f;
 }
 * { box-sizing: border-box; }
 body {
@@ -14,10 +27,15 @@ body {
   line-height: 1.6;
 }
 header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface);
 }
+.header-left { flex: 1; min-width: 0; }
 .site-title { margin: 0 0 .5rem; font-size: 1.2rem; }
 nav a {
   margin-right: 1rem;
@@ -26,19 +44,30 @@ nav a {
   font-weight: 600;
 }
 nav a:hover { text-decoration: underline; }
+.theme-toggle {
+  flex-shrink: 0;
+  padding: .4rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  font-size: .9rem;
+}
+.theme-toggle:hover { background: var(--tag-bg); }
 main { max-width: 720px; margin: 0 auto; padding: 1.5rem; }
-details { margin-bottom: .5rem; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+details { margin-bottom: .5rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
 summary { padding: .6rem 1rem; cursor: pointer; font-weight: 600; }
 details ul { margin: 0; padding: .5rem 1rem 1rem 2rem; }
 ul { padding-left: 1.5rem; }
 li { margin-bottom: .3rem; }
 a { color: var(--accent); }
-.tag-filter { width: 100%; padding: .5rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 4px; font-size: 1rem; }
+.tag-filter { width: 100%; padding: .5rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 4px; font-size: 1rem; background: var(--surface); color: var(--fg); }
 .meta { color: var(--muted); font-size: .9rem; }
 .tags { margin: .5rem 0 1.5rem; }
 .tag {
   display: inline-block;
-  background: #eef2fb;
+  background: var(--tag-bg);
   color: var(--accent);
   border-radius: 12px;
   padding: .15rem .6rem;
@@ -46,4 +75,5 @@ a { color: var(--accent); }
   font-size: .85rem;
   text-decoration: none;
 }
-.tag:hover { background: #dde6f8; }
+.tag:hover { background: var(--tag-bg-hover); }
+.article-body { font-size: 1.2em; }
