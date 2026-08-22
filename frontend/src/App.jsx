@@ -1,6 +1,8 @@
 import { HashRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import "./index.css";
 import DateView from "./components/DateView";
+import TagListView from "./components/TagListView";
+import TagFilteredView from "./components/TagFilteredView";
 
 function Placeholder() {
   return <p>此檢視尚未實作。</p>;
@@ -20,8 +22,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/date" replace />} />
           <Route path="/date" element={<DateView />} />
-          <Route path="/tags" element={<Placeholder />} />
-          <Route path="/tag/:tag" element={<Placeholder />} />
+          <Route path="/tags" element={<TagListView />} />
+          <Route path="/tag/:tag" element={<TagFilteredView />} />
           <Route path="/article/:nid" element={<Placeholder />} />
         </Routes>
       </main>
