@@ -3,6 +3,7 @@ import "./index.css";
 import DateView from "./components/DateView";
 import TagListView from "./components/TagListView";
 import TagFilteredView from "./components/TagFilteredView";
+import ArticleView from "./components/ArticleView";
 
 function Placeholder() {
   return <p>此檢視尚未實作。</p>;
@@ -24,7 +25,7 @@ export default function App() {
           <Route path="/date" element={<DateView />} />
           <Route path="/tags" element={<TagListView />} />
           <Route path="/tag/:tag" element={<TagFilteredView />} />
-          <Route path="/article/:nid" element={<Placeholder />} />
+          <Route path="/article/:nid" element={<ArticleView />} />
         </Routes>
       </main>
     </HashRouter>
