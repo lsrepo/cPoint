@@ -21,6 +21,7 @@ def main():
     conn = db.connect(path)
     db.upsert_article(conn, "1", "Title A", "2025-01-02", "http://x/1", "Body A", ["樓市"])
     db.upsert_article(conn, "2", "Title B", "2025-01-01", "http://x/2", "Body B", ["樓市", "美國"])
+    db.upsert_article(conn, "3", "Title C", "2024-06-01", "http://x/3", "Body C", ["樓市"])
     conn.commit()
     conn.close()
 
@@ -31,16 +32,30 @@ def main():
         res = client.get("/api/articles")
         assert res.status_code == 200
         articles = res.json()
-        assert [a["nid"] for a in articles] == ["1", "2"], articles
+        assert [a["nid"] for a in articles] == ["1", "2", "3"], articles
 
         res = client.get("/api/articles", params={"tag": "樓市"})
         assert res.status_code == 200
-        assert [a["nid"] for a in res.json()] == ["1", "2"]
+        assert [a["nid"] for a in res.json()] == ["1", "2", "3"]
 
         res = client.get("/api/tags")
         assert res.status_code == 200
         tags = {t["tag"]: t["count"] for t in res.json()}
-        assert tags == {"樓市": 2, "美國": 1}, tags
+        assert tags == {"樓市": 3, "美國": 1}, tags
+
+        res = client.get("/api/years")
+        assert res.status_code == 200
+        assert res.json() == ["2025", "2024"], res.json()
+
+        res = client.get("/api/tags", params={"year": "2025"})
+        assert res.status_code == 200
+        tags_2025 = {t["tag"]: t["count"] for t in res.json()}
+        assert tags_2025 == {"樓市": 2, "美國": 1}, tags_2025
+
+        res = client.get("/api/tags", params={"year": "2024"})
+        assert res.status_code == 200
+        tags_2024 = {t["tag"]: t["count"] for t in res.json()}
+        assert tags_2024 == {"樓市": 1}, tags_2024
 
         res = client.get("/api/article/1")
         assert res.status_code == 200

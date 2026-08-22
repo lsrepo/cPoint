@@ -50,10 +50,19 @@ def get_articles(tag: str | None = None):
 
 
 @app.get("/api/tags", response_model=list[TagCount])
-def get_tags():
+def get_tags(year: str | None = None):
     conn = db.connect(DB_PATH)
     try:
-        return db.list_tags(conn)
+        return db.list_tags(conn, year=year)
+    finally:
+        conn.close()
+
+
+@app.get("/api/years", response_model=list[str])
+def get_years():
+    conn = db.connect(DB_PATH)
+    try:
+        return db.list_years(conn)
     finally:
         conn.close()
 

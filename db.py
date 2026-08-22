@@ -85,13 +85,30 @@ def list_articles(conn, tag=None):
     return [_row_to_summary(row) for row in rows]
 
 
-def list_tags(conn):
-    rows = conn.execute(
-        "SELECT t.name, COUNT(*) AS n FROM tags t "
-        "JOIN article_tags at ON at.tag_id = t.id "
-        "GROUP BY t.name ORDER BY n DESC"
-    ).fetchall()
+def list_tags(conn, year=None):
+    if year:
+        rows = conn.execute(
+            "SELECT t.name, COUNT(*) AS n FROM tags t "
+            "JOIN article_tags at ON at.tag_id = t.id "
+            "JOIN articles a ON a.nid = at.article_nid "
+            "WHERE substr(a.date, 1, 4) = ? "
+            "GROUP BY t.name ORDER BY n DESC",
+            (year,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT t.name, COUNT(*) AS n FROM tags t "
+            "JOIN article_tags at ON at.tag_id = t.id "
+            "GROUP BY t.name ORDER BY n DESC"
+        ).fetchall()
     return [{"tag": name, "count": n} for name, n in rows]
+
+
+def list_years(conn):
+    rows = conn.execute(
+        "SELECT DISTINCT substr(date, 1, 4) AS year FROM articles ORDER BY year DESC"
+    ).fetchall()
+    return [r[0] for r in rows]
 
 
 def get_article(conn, nid):

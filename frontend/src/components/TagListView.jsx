@@ -1,24 +1,39 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getTags } from "../api";
+import { getTags, getYears } from "../api";
 
 export default function TagListView() {
+  const [years, setYears] = useState([]);
+  const [year, setYear] = useState("");
   const [tags, setTags] = useState(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    getTags().then(setTags).catch((err) => setError(err.message));
+    getYears().then(setYears).catch((err) => setError(err.message));
   }, []);
 
-  if (error) return <p>載入失敗，請稍後再試。</p>;
-  if (tags === null) return <p>載入中...</p>;
+  useEffect(() => {
+    setTags(null);
+    setError(null);
+    getTags(year || undefined).then(setTags).catch((err) => setError(err.message));
+  }, [year]);
 
-  const filtered = tags.filter((t) => t.tag.includes(query));
+  if (error) return <p>載入失敗，請稍後再試。</p>;
 
   return (
     <>
       <h1>依標籤瀏覽</h1>
+      <select
+        className="tag-filter"
+        value={year}
+        onChange={(e) => setYear(e.target.value)}
+      >
+        <option value="">全部年份</option>
+        {years.map((y) => (
+          <option key={y} value={y}>{y}</option>
+        ))}
+      </select>
       <input
         className="tag-filter"
         type="text"
@@ -26,14 +41,20 @@ export default function TagListView() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <p>共 {tags.length} 個標籤</p>
-      <ul>
-        {filtered.map(({ tag, count }) => (
-          <li key={tag}>
-            <Link to={`/tag/${encodeURIComponent(tag)}`}>{tag}</Link>（{count}）
-          </li>
-        ))}
-      </ul>
+      {tags === null ? (
+        <p>載入中...</p>
+      ) : (
+        <>
+          <p>共 {tags.length} 個標籤</p>
+          <ul>
+            {tags.filter((t) => t.tag.includes(query)).map(({ tag, count }) => (
+              <li key={tag}>
+                <Link to={`/tag/${encodeURIComponent(tag)}`}>{tag}</Link>（{count}）
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </>
   );
 }
