@@ -21,7 +21,7 @@
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  font-family: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
   background: var(--bg);
   color: var(--fg);
   line-height: 1.6;
