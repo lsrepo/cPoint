@@ -38,6 +38,18 @@ def main():
         assert res.status_code == 200
         assert [a["nid"] for a in res.json()] == ["1", "2", "3"]
 
+        res = client.get("/api/articles", params={"tag": "樓市", "year": "2025"})
+        assert res.status_code == 200
+        assert [a["nid"] for a in res.json()] == ["1", "2"], res.json()
+
+        res = client.get("/api/articles", params={"tag": "美國", "year": "2025"})
+        assert res.status_code == 200
+        assert [a["nid"] for a in res.json()] == ["2"], res.json()
+
+        res = client.get("/api/articles", params={"tag": "樓市", "year": "2024"})
+        assert res.status_code == 200
+        assert [a["nid"] for a in res.json()] == ["3"], res.json()
+
         res = client.get("/api/tags")
         assert res.status_code == 200
         tags = {t["tag"]: t["count"] for t in res.json()}

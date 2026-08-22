@@ -36,9 +36,25 @@ def main():
         tag2_articles = db.list_articles(conn, tag="tag2")
         assert [a["nid"] for a in tag2_articles] == ["2", "1"], tag2_articles
 
+        year_2025_articles = db.list_articles(conn, year="2025")
+        assert [a["nid"] for a in year_2025_articles] == ["2", "1"], year_2025_articles
+        year_2024_articles = db.list_articles(conn, year="2024")
+        assert [a["nid"] for a in year_2024_articles] == ["3"], year_2024_articles
+
+        tag2_2025_articles = db.list_articles(conn, tag="tag2", year="2025")
+        assert [a["nid"] for a in tag2_2025_articles] == ["2", "1"], tag2_2025_articles
+        tag1_2025_articles = db.list_articles(conn, tag="tag1", year="2025")
+        assert [a["nid"] for a in tag1_2025_articles] == ["1"], tag1_2025_articles
+        tag1_2024_articles = db.list_articles(conn, tag="tag1", year="2024")
+        assert tag1_2024_articles == [], \
+            "tag+year combination must be an AND, not match an article satisfying only one"
+
         tags = db.list_tags(conn)
         tags_by_name = {t["tag"]: t["count"] for t in tags}
         assert tags_by_name == {"tag1": 1, "tag2": 2}, tags_by_name
+
+        years = db.list_years(conn)
+        assert years == ["2025", "2024"], years
 
         article = db.get_article(conn, "1")
         assert article["title"] == "Title A"

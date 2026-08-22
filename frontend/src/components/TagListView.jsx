@@ -49,7 +49,9 @@ export default function TagListView() {
           <ul>
             {tags.filter((t) => t.tag.includes(query)).map(({ tag, count }) => (
               <li key={tag}>
-                <Link to={`/tag/${encodeURIComponent(tag)}`}>{tag}</Link>（{count}）
+                <Link to={year ? `/tag/${encodeURIComponent(tag)}?year=${encodeURIComponent(year)}` : `/tag/${encodeURIComponent(tag)}`}>
+                  {tag}
+                </Link>（{count}）
               </li>
             ))}
           </ul>

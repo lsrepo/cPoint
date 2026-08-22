@@ -64,24 +64,26 @@ def _row_to_summary(row):
     return {"nid": nid, "title": title, "date": date, "hashtags": tags.split(";") if tags else []}
 
 
-def list_articles(conn, tag=None):
+def list_articles(conn, tag=None, year=None):
+    joins = ""
+    where = []
+    params = []
     if tag:
-        query = f"""
-            SELECT a.nid, a.title, a.date, {TAGS_SUBQUERY} AS tags
-            FROM articles a
-            JOIN article_tags at ON at.article_nid = a.nid
-            JOIN tags t ON t.id = at.tag_id
-            WHERE t.name = ?
-            ORDER BY a.date DESC
-        """
-        rows = conn.execute(query, (tag,)).fetchall()
-    else:
-        query = f"""
-            SELECT a.nid, a.title, a.date, {TAGS_SUBQUERY} AS tags
-            FROM articles a
-            ORDER BY a.date DESC
-        """
-        rows = conn.execute(query).fetchall()
+        joins = "JOIN article_tags at ON at.article_nid = a.nid JOIN tags t ON t.id = at.tag_id"
+        where.append("t.name = ?")
+        params.append(tag)
+    if year:
+        where.append("substr(a.date, 1, 4) = ?")
+        params.append(year)
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+    query = f"""
+        SELECT a.nid, a.title, a.date, {TAGS_SUBQUERY} AS tags
+        FROM articles a
+        {joins}
+        {where_clause}
+        ORDER BY a.date DESC
+    """
+    rows = conn.execute(query, params).fetchall()
     return [_row_to_summary(row) for row in rows]
 
 

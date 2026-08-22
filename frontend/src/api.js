@@ -1,5 +1,9 @@
-export async function getArticles(tag) {
-  const url = tag ? `/api/articles?tag=${encodeURIComponent(tag)}` : "/api/articles";
+export async function getArticles(tag, year) {
+  const params = new URLSearchParams();
+  if (tag) params.set("tag", tag);
+  if (year) params.set("year", year);
+  const qs = params.toString();
+  const url = qs ? `/api/articles?${qs}` : "/api/articles";
   const res = await fetch(url);
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
   return res.json();

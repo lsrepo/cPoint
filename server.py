@@ -41,10 +41,10 @@ class TagCount(BaseModel):
 
 
 @app.get("/api/articles", response_model=list[ArticleSummary])
-def get_articles(tag: str | None = None):
+def get_articles(tag: str | None = None, year: str | None = None):
     conn = db.connect(DB_PATH)
     try:
-        return db.list_articles(conn, tag=tag)
+        return db.list_articles(conn, tag=tag, year=year)
     finally:
         conn.close()
 
