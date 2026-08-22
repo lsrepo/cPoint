@@ -1,0 +1,15 @@
+# Bulk scraped data (regenerable via download_am730_column.py / migrate_to_sqlite.py)
+articles_*/
+articles_metadata.csv
+yearly_top_tags.csv
+download_all_years.log
+
+# Article browser site (added to as the plan's tasks build it)
+articles.db
+venv/
+__pycache__/
+*.pyc
+frontend/node_modules/
+frontend/dist/
+
+.DS_Store
