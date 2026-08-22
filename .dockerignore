@@ -1,0 +1,16 @@
+.git
+.worktrees
+docs
+checks
+venv
+frontend/node_modules
+frontend/dist
+articles_*/
+articles_metadata.csv
+yearly_top_tags.csv
+download_all_years.log
+download_all_years.sh
+export_metadata_csv.py
+__pycache__
+*.pyc
+.DS_Store

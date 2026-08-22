@@ -3,7 +3,22 @@
 A local website for browsing the am730 column archive: FastAPI + SQLite
 backend, React frontend.
 
-## First-time setup
+## Run with Docker
+
+The simplest way to run it — no local Python/Node setup needed:
+
+```bash
+docker build -t cpoint .
+docker run -p 8420:8420 cpoint
+```
+
+Open <http://localhost:8420/>. `articles.db` is checked into the repo and
+baked into the image, so it works immediately; on startup the container
+also runs `sync_articles.py` in the background to pull in anything
+published since the image was built (see "Keeping it up to date" below —
+same script, same stop-at-known-article behavior).
+
+## First-time setup (without Docker)
 
 From the repository root:
 
@@ -12,22 +27,20 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-python3 migrate_to_sqlite.py   # one-time: import articles_<year>/*.txt into articles.db
-
 cd frontend
 npm install
 npm run build
 cd ..
 ```
 
-`migrate_to_sqlite.py` is a one-time historical bootstrap: it requires the
-original downloader's output directories (`articles_<year>/*.txt`) to
-already exist locally, and only fetches hashtag metadata over the network
-— it does not download article bodies itself. If those directories don't
-exist (e.g. a fresh clone with no prior scrape), skip it and run
-`python3 sync_articles.py` instead — it walks the entire listing API from
-an empty database and populates `articles.db` directly. That's slower
-(it fetches every article body over the network) but self-contained.
+`articles.db` is checked into the repo, so no migration step is needed —
+a fresh clone already has the full archive. `migrate_to_sqlite.py` only
+matters if you're re-bootstrapping from a raw local scrape
+(`articles_<year>/*.txt`) instead of using the checked-in database; if you
+ever need to start from a completely empty database instead, run
+`python3 sync_articles.py` — it walks the entire listing API from empty
+and populates `articles.db` directly (slower, since it fetches every
+article body over the network, but self-contained).
 
 ## Run it
 
