@@ -2,7 +2,10 @@
 """Verify db.py's schema and query helpers, using an isolated temporary
 database. No network access, fully deterministic."""
 import os
+import sys
 import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import db
 
