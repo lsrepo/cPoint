@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { getArticle } from "../api";
+import CantoneseAudioPlayer from "./CantoneseAudioPlayer";
 
 export default function ArticleView() {
   const { nid } = useParams();
@@ -32,6 +33,7 @@ export default function ArticleView() {
           <Link key={t} className="tag" to={`/tag/${encodeURIComponent(t)}`}>{t}</Link>
         ))}
       </p>
+      <CantoneseAudioPlayer body={article.body} />
       <div className="article-body">
         {article.body.split("\n\n").map((para, i) => (
           <p key={i}>{para}</p>

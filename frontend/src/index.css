@@ -77,3 +77,16 @@ a { color: var(--accent); }
 }
 .tag:hover { background: var(--tag-bg-hover); }
 .article-body { font-size: 1.2em; }
+.audio-player { display: flex; gap: .5rem; margin: 0 0 1.5rem; }
+.audio-player button {
+  padding: .4rem .9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  font-size: .9rem;
+}
+.audio-player button:hover:not(:disabled) { background: var(--tag-bg); }
+.audio-player button:disabled { opacity: .5; cursor: default; }
+.audio-player-unavailable { color: var(--muted); font-size: .85rem; margin: 0 0 1.5rem; }
