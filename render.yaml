@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: cpoint
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
