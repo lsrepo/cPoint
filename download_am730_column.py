@@ -184,18 +184,26 @@ def html_to_text(body_html):
     return "\n\n".join(lines)
 
 
-def fetch_article_text(relative_url):
-    full_url = SITE + urllib.parse.quote(relative_url, safe="/:")
-    req = urllib.request.Request(full_url, headers=HEADERS)
-    page = request_with_retry(req).decode("utf-8", errors="replace")
-
+def extract_body_text(page):
+    """Pull the article__body div out of a full page's HTML and turn it
+    into plain text, stripping known ad-widget blocks first: `adbox`
+    (banner ads) and `custom_content` (a native-ad widget whose visible
+    "ADVERTISEMENT" label otherwise leaks into the extracted text)."""
     m = re.search(r'<div class="article__body"[^>]*>', page)
     if not m:
         return ""
     body_html, _ = find_balanced_div(page, m.end())
     body_html = strip_div_class_blocks(body_html, "adbox")
+    body_html = strip_div_class_blocks(body_html, "custom_content")
     body_html = strip_tag_blocks(body_html, "figure")
     return html_to_text(body_html)
+
+
+def fetch_article_text(relative_url):
+    full_url = SITE + urllib.parse.quote(relative_url, safe="/:")
+    req = urllib.request.Request(full_url, headers=HEADERS)
+    page = request_with_retry(req).decode("utf-8", errors="replace")
+    return extract_body_text(page)
 
 
 def safe_filename(name):
