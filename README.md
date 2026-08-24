@@ -76,9 +76,9 @@ Open <http://localhost:8420/>.
 
 ## Keeping it up to date
 
-New articles are published roughly daily. Run this any time to pull in
-whatever's new — it stops as soon as it reaches an article already stored,
-so it never re-walks the full archive:
+New articles are published roughly daily (weekdays). You can always pull
+in whatever's new by hand — it stops as soon as it reaches an article
+already stored, so it never re-walks the full archive:
 
 ```bash
 python3 sync_articles.py
@@ -86,6 +86,14 @@ python3 sync_articles.py
 
 `server.py` reads `articles.db` live, so a sync takes effect immediately —
 no restart needed.
+
+**Automated daily sync.** [`.github/workflows/sync-articles.yml`](.github/workflows/sync-articles.yml)
+runs the same script on a schedule (06:00 HKT daily, plus a manual
+`workflow_dispatch` trigger), and commits + pushes `articles.db` to `main`
+if it found anything new. The deployed instance is on Dokploy with GitOps
+enabled watching `main`, so a push from this workflow automatically
+triggers a rebuild + redeploy there — the full loop (scrape → commit →
+redeploy) runs unattended every morning with no manual step.
 
 ## Development mode
 

@@ -77,3 +77,15 @@ bind). Port is 8420 everywhere in this project (not the more common 8000
 — that port was already occupied by an unrelated process during
 development; no need to reconcile if you see 8000 in a generic
 FastAPI/Vite example elsewhere).
+
+**Daily sync → redeploy loop.** `.github/workflows/sync-articles.yml` runs
+`sync_articles.py` on a schedule (06:00 HKT / 22:00 UTC cron, plus
+`workflow_dispatch` for manual runs) and, only if `articles.db` actually
+changed, commits and pushes it to `main` as `github-actions[bot]`. The
+live deployment is on Dokploy with GitOps watching `main`, so that push is
+what triggers the rebuild + redeploy — there's no separate deploy step or
+webhook configured in this repo, Dokploy does it on its own by watching
+the branch. This means `articles.db` in the deployed container is only as
+fresh as the last successful push from this workflow, not continuously
+live; the container itself does not re-sync while running (see
+`docker-entrypoint.sh` above — sync only happens at container start).
