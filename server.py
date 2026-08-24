@@ -30,9 +30,16 @@ class ArticleSummary(BaseModel):
     hashtags: list[str]
 
 
+class AdjacentArticle(BaseModel):
+    nid: str
+    title: str
+
+
 class ArticleDetail(ArticleSummary):
     url: str
     body: str
+    prev: AdjacentArticle | None = None
+    next: AdjacentArticle | None = None
 
 
 class TagCount(BaseModel):

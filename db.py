@@ -124,4 +124,19 @@ def get_article(conn, nid):
         "SELECT t.name FROM tags t JOIN article_tags at ON at.tag_id = t.id "
         "WHERE at.article_nid = ?", (nid,)
     ).fetchall()]
-    return {"nid": nid, "title": title, "date": date, "url": url, "hashtags": tags, "body": body}
+    prev_row = conn.execute(
+        "SELECT nid, title FROM articles WHERE (date, nid) < (?, ?) "
+        "ORDER BY date DESC, nid DESC LIMIT 1",
+        (date, nid),
+    ).fetchone()
+    next_row = conn.execute(
+        "SELECT nid, title FROM articles WHERE (date, nid) > (?, ?) "
+        "ORDER BY date ASC, nid ASC LIMIT 1",
+        (date, nid),
+    ).fetchone()
+    prev = {"nid": prev_row[0], "title": prev_row[1]} if prev_row else None
+    next_ = {"nid": next_row[0], "title": next_row[1]} if next_row else None
+    return {
+        "nid": nid, "title": title, "date": date, "url": url,
+        "hashtags": tags, "body": body, "prev": prev, "next": next_,
+    }

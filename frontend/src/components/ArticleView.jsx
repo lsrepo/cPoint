@@ -39,6 +39,18 @@ export default function ArticleView() {
           <p key={i}>{para}</p>
         ))}
       </div>
+      <nav className="article-nav">
+        {article.prev ? (
+          <Link className="article-nav-prev" to={`/article/${article.prev.nid}`} state={{ from: backTo }}>
+            &laquo; {article.prev.title}
+          </Link>
+        ) : <span />}
+        {article.next ? (
+          <Link className="article-nav-next" to={`/article/${article.next.nid}`} state={{ from: backTo }}>
+            {article.next.title} &raquo;
+          </Link>
+        ) : <span />}
+      </nav>
     </>
   );
 }
