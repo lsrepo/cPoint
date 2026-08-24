@@ -23,7 +23,6 @@ export default function TagListView() {
 
   return (
     <>
-      <h1>依標籤瀏覽</h1>
       <select
         className="tag-filter"
         value={year}

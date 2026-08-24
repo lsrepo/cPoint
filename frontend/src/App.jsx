@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HashRouter, Routes, Route, Navigate, Link } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import "./index.css";
 import DateView from "./components/DateView";
 import TagListView from "./components/TagListView";
@@ -33,17 +33,24 @@ function ThemeToggle() {
   );
 }
 
+function NavToggle() {
+  const location = useLocation();
+  const isTags = location.pathname.startsWith("/tag");
+  return (
+    <nav className="nav-toggle">
+      依 <Link to="/date" className={isTags ? "" : "active"}>日期</Link>
+      <span className="nav-toggle-sep">/</span>
+      <Link to="/tags" className={isTags ? "active" : ""}>標籤</Link> 瀏覽
+    </nav>
+  );
+}
+
 export default function App() {
   return (
     <HashRouter>
       <header>
-        <div className="header-left">
-          <h1 className="site-title">施永青「C觀點」文章庫</h1>
-          <nav>
-            <Link to="/date">依日期</Link>
-            <Link to="/tags">依標籤</Link>
-          </nav>
-        </div>
+        <h1 className="site-title">「C觀點」文章庫</h1>
+        <NavToggle />
         <ThemeToggle />
       </header>
       <main>

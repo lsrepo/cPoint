@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getArticles } from "../api";
 
+function shortDate(date) {
+  const [, month, day] = date.split("-");
+  return `${parseInt(day, 10)}/${parseInt(month, 10)}`;
+}
+
 function groupByYear(articles) {
   const groups = new Map();
   for (const a of articles) {
@@ -28,14 +33,13 @@ export default function DateView() {
 
   return (
     <>
-      <h1>依日期瀏覽</h1>
       {groups.map(([year, arts]) => (
         <details key={year} open={year === currentYear}>
           <summary>{year}（{arts.length}）</summary>
           <ul>
             {arts.map((a) => (
               <li key={a.nid}>
-                <Link to={`/article/${a.nid}`}>{a.date} — {a.title}</Link>
+                <Link className="article-link" to={`/article/${a.nid}`}>{shortDate(a.date)} — {a.title}</Link>
               </li>
             ))}
           </ul>

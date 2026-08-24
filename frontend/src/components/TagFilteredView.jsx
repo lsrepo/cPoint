@@ -29,7 +29,7 @@ export default function TagFilteredView() {
       <ul>
         {articles.map((a) => (
           <li key={a.nid}>
-            <Link to={`/article/${a.nid}`} state={{ from: backTo }}>{a.date} — {a.title}</Link>
+            <Link className="article-link" to={`/article/${a.nid}`} state={{ from: backTo }}>{a.date} — {a.title}</Link>
           </li>
         ))}
       </ul>
