@@ -62,6 +62,20 @@ def main():
         assert set(article["hashtags"]) == {"tag1", "tag2"}
         assert db.get_article(conn, "999") is None
 
+        # prev/next are chronologically adjacent by (date, nid), not insertion order:
+        # nid "1" is 2025-01-01, "2" is 2025-02-01, "3" is 2024-01-01
+        article_1 = db.get_article(conn, "1")
+        assert article_1["prev"] == {"nid": "3", "title": "Title C", "date": "2024-01-01"}, article_1["prev"]
+        assert article_1["next"] == {"nid": "2", "title": "Title B", "date": "2025-02-01"}, article_1["next"]
+
+        article_2 = db.get_article(conn, "2")  # most recent article has no next
+        assert article_2["prev"]["nid"] == "1"
+        assert article_2["next"] is None
+
+        article_3 = db.get_article(conn, "3")  # oldest article has no prev
+        assert article_3["prev"] is None
+        assert article_3["next"]["nid"] == "1"
+
         # re-upserting an existing nid replaces its tag set rather than accumulating it
         db.upsert_article(conn, "1", "Title A (edited)", "2025-01-01", "http://x/1", "Body A edited", ["tag3"])
         conn.commit()

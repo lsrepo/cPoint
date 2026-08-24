@@ -33,6 +33,7 @@ class ArticleSummary(BaseModel):
 class AdjacentArticle(BaseModel):
     nid: str
     title: str
+    date: str
 
 
 class ArticleDetail(ArticleSummary):
