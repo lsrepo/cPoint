@@ -49,7 +49,9 @@ export default function App() {
   return (
     <HashRouter>
       <header>
-        <h1 className="site-title">「C觀點」文章庫</h1>
+        <h1 className="site-title">
+          <Link to="/date">「C觀點」文章庫</Link>
+        </h1>
         <NavToggle />
         <ThemeToggle />
       </header>
