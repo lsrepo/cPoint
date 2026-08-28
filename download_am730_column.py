@@ -18,9 +18,18 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 SITE = "https://www.am730.com.hk"
 DEFAULT_COLUMNIST_URL = SITE + "/columnist/28169/C%E8%A7%80%E9%BB%9E:%20%E6%96%BD%E6%B0%B8%E9%9D%92"
+
+HKT = timezone(timedelta(hours=8))
+
+
+def to_hkt_date(publish_date):
+    """Convert an API publishDate (UTC ISO string) to a YYYY-MM-DD date in HKT."""
+    dt = datetime.strptime(publish_date[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    return dt.astimezone(HKT).strftime("%Y-%m-%d")
 
 HEADERS = {
     "User-Agent": (
@@ -99,9 +108,9 @@ def fetch_articles_for_year(columnist_url, year, delay):
         stop = False
         for item in items:
             pub_date = item.get("publishDate", "")
-            year_str = pub_date[:4]
-            if not year_str.isdigit():
+            if not pub_date:
                 continue
+            year_str = to_hkt_date(pub_date)[:4]
             item_year = int(year_str)
             if item_year == year:
                 articles.append(item)
@@ -285,7 +294,7 @@ def main():
     for i, item in enumerate(articles, 1):
         nid = item.get("nid")
         title = item.get("title", "")
-        pub_date = item.get("publishDate", "")[:10]
+        pub_date = to_hkt_date(item.get("publishDate", ""))
         rel_url = item.get("url", "")
         print(f"[{i}/{len(articles)}] {pub_date}  {title}", file=sys.stderr)
 

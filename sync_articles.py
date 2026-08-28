@@ -29,7 +29,7 @@ def sync(columnist_url, db_path, delay):
                 stop = True
                 break
             title = item.get("title", "")
-            pub_date = item.get("publishDate", "")[:10]
+            pub_date = dl.to_hkt_date(item.get("publishDate", ""))
             rel_url = item.get("url", "")
             tags = [t for t in item.get("hashtags", []) if t not in BOILERPLATE_TAGS]
             body = dl.fetch_article_text(rel_url)
