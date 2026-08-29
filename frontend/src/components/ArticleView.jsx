@@ -8,6 +8,7 @@ export default function ArticleView() {
   const { nid } = useParams();
   const location = useLocation();
   const backTo = location.state?.from || "/date";
+  const isRandomMode = backTo === "/random";
   const [article, setArticle] = useState(undefined);
   const [error, setError] = useState(null);
   const paragraphRefs = useRef([]);
@@ -57,12 +58,16 @@ export default function ArticleView() {
         ))}
       </div>
       <nav className="article-nav">
-        {article.prev ? (
+        {isRandomMode ? (
+          <Link className="article-nav-prev" to="/random">&laquo; 隨機</Link>
+        ) : article.prev ? (
           <Link className="article-nav-prev" to={`/article/${article.prev.nid}`} state={{ from: backTo }}>
             &laquo; {article.prev.date}
           </Link>
         ) : <span />}
-        {article.next ? (
+        {isRandomMode ? (
+          <Link className="article-nav-next" to="/random">隨機 &raquo;</Link>
+        ) : article.next ? (
           <Link className="article-nav-next" to={`/article/${article.next.nid}`} state={{ from: backTo }}>
             {article.next.date} &raquo;
           </Link>

@@ -4,6 +4,7 @@ import "./index.css";
 import DateView from "./components/DateView";
 import TagListView from "./components/TagListView";
 import TagFilteredView from "./components/TagFilteredView";
+import RandomView from "./components/RandomView";
 import ArticleView from "./components/ArticleView";
 
 const THEME_KEY = "theme";
@@ -36,11 +37,16 @@ function ThemeToggle() {
 function NavToggle() {
   const location = useLocation();
   const isTags = location.pathname.startsWith("/tag");
+  const cameFromRandom = location.pathname.startsWith("/article") && location.state?.from === "/random";
+  const isRandom = location.pathname.startsWith("/random") || cameFromRandom;
+  const isDate = !isTags && !isRandom;
   return (
     <nav className="nav-toggle">
-      依 <Link to="/date" className={isTags ? "" : "active"}>日期</Link>
+      依 <Link to="/date" className={isDate ? "active" : ""}>日期</Link>
       <span className="nav-toggle-sep">/</span>
-      <Link to="/tags" className={isTags ? "active" : ""}>標籤</Link> 瀏覽
+      <Link to="/tags" className={isTags ? "active" : ""}>標籤</Link>
+      <span className="nav-toggle-sep">/</span>
+      <Link to="/random" className={isRandom ? "active" : ""}>隨機</Link> 瀏覽
     </nav>
   );
 }
@@ -61,6 +67,7 @@ export default function App() {
           <Route path="/date" element={<DateView />} />
           <Route path="/tags" element={<TagListView />} />
           <Route path="/tag/:tag" element={<TagFilteredView />} />
+          <Route path="/random" element={<RandomView />} />
           <Route path="/article/:nid" element={<ArticleView />} />
         </Routes>
       </main>
