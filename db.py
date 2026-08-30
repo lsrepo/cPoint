@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """SQLite schema and query helpers for the article database. Shared by
 migrate_to_sqlite.py, sync_articles.py, and server.py."""
+import json
 import sqlite3
 
 DB_PATH = "articles.db"
@@ -23,6 +24,10 @@ CREATE TABLE IF NOT EXISTS article_tags (
     PRIMARY KEY (article_nid, tag_id)
 );
 CREATE INDEX IF NOT EXISTS idx_articles_date ON articles(date);
+CREATE TABLE IF NOT EXISTS vocab_cache (
+    article_nid TEXT PRIMARY KEY REFERENCES articles(nid),
+    terms_json TEXT NOT NULL
+);
 """
 
 TAGS_SUBQUERY = """
@@ -140,3 +145,19 @@ def get_article(conn, nid):
         "nid": nid, "title": title, "date": date, "url": url,
         "hashtags": tags, "body": body, "prev": prev, "next": next_,
     }
+
+
+def get_vocab_cache(conn, nid):
+    row = conn.execute(
+        "SELECT terms_json FROM vocab_cache WHERE article_nid = ?", (nid,)
+    ).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def save_vocab_cache(conn, nid, terms):
+    conn.execute(
+        "INSERT INTO vocab_cache (article_nid, terms_json) VALUES (?, ?) "
+        "ON CONFLICT(article_nid) DO UPDATE SET terms_json = excluded.terms_json",
+        (nid, json.dumps(terms, ensure_ascii=False)),
+    )
+    conn.commit()

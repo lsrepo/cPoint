@@ -3,12 +3,16 @@
 for the built React frontend (frontend/dist, once it exists)."""
 import os
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import db
+import vocab
+
+load_dotenv()
 
 DB_PATH = db.DB_PATH
 FRONTEND_DIST = os.path.join("frontend", "dist")
@@ -48,6 +52,14 @@ class TagCount(BaseModel):
     count: int
 
 
+class VocabTerm(BaseModel):
+    term: str
+    pos: str
+    ipa: str
+    zh: str
+    example: str
+
+
 @app.get("/api/articles", response_model=list[ArticleSummary])
 def get_articles(tag: str | None = None, year: str | None = None):
     conn = db.connect(DB_PATH)
@@ -85,6 +97,29 @@ def get_article(nid: str):
     if article is None:
         raise HTTPException(status_code=404, detail="not found")
     return article
+
+
+@app.get("/api/article/{nid}/vocab", response_model=list[VocabTerm])
+def get_article_vocab(nid: str):
+    conn = db.connect(DB_PATH)
+    try:
+        article = db.get_article(conn, nid)
+        if article is None:
+            raise HTTPException(status_code=404, detail="not found")
+
+        cached = db.get_vocab_cache(conn, nid)
+        if cached is not None:
+            return cached
+
+        try:
+            terms = vocab.generate_vocab(article["title"], article["body"])
+        except vocab.VocabError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+
+        db.save_vocab_cache(conn, nid, terms)
+        return terms
+    finally:
+        conn.close()
 
 
 # Mounted last so it never shadows the /api/* routes above; only present

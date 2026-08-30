@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { getArticle } from "../api";
 import { nextParagraphIndex } from "../scrollNav";
 import CantoneseAudioPlayer from "./CantoneseAudioPlayer";
+import EnglishCorner from "./EnglishCorner";
 
 export default function ArticleView() {
   const { nid } = useParams();
@@ -73,6 +74,7 @@ export default function ArticleView() {
           </Link>
         ) : <span />}
       </nav>
+      <EnglishCorner nid={nid} />
     </>
   );
 }

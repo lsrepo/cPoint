@@ -118,3 +118,33 @@ a { color: var(--accent); text-decoration: underline; text-underline-offset: .2e
 }
 .article-nav-prev { text-align: left; }
 .article-nav-next { text-align: right; }
+.vocab-corner { margin-top: 2rem; font-size: 1rem; }
+.vocab-corner-title {
+  font-size: .95rem;
+  font-weight: 600;
+  letter-spacing: .05em;
+  color: var(--muted);
+  margin: 0 0 .8rem;
+}
+.vocab-corner-loading { color: var(--muted); font-size: .9rem; }
+.vocab-list { list-style: none; margin: 0; padding: 0; }
+.vocab-item { padding: .8rem 0; border-top: 1px solid var(--border); }
+.vocab-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .1rem .6rem;
+}
+.vocab-term { font-weight: 700; }
+.vocab-pos, .vocab-ipa, .vocab-zh { color: var(--muted); font-size: .85rem; }
+.vocab-play-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  border-radius: 2px;
+  padding: .05rem .5rem;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.vocab-play-btn:hover { background: var(--tag-bg-hover); }
+.vocab-example { margin: .35rem 0 0; color: var(--fg); font-size: .95rem; }

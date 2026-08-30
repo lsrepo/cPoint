@@ -28,3 +28,9 @@ export async function getArticle(nid) {
   if (!res.ok) throw new Error(`GET /api/article/${nid} failed: ${res.status}`);
   return res.json();
 }
+
+export async function getVocab(nid) {
+  const res = await fetch(`/api/article/${nid}/vocab`);
+  if (!res.ok) throw new Error(`GET /api/article/${nid}/vocab failed: ${res.status}`);
+  return res.json();
+}
