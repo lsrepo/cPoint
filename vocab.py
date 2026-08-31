@@ -9,7 +9,7 @@ import re
 import httpx
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "minimax/minimax-m2.7:free"
+DEFAULT_MODEL = "deepseek/deepseek-v4-flash-0731"
 REQUIRED_FIELDS = ("term", "pos", "ipa", "zh", "example")
 
 PROMPT_TEMPLATE = """You are helping a Cantonese-speaking reader learn English vocabulary through a Chinese-language opinion column.
