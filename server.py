@@ -20,6 +20,7 @@ logger = logging.getLogger("uvicorn.error")
 
 DB_PATH = db.DB_PATH
 FRONTEND_DIST = os.path.join("frontend", "dist")
+ENGLISH_CORNER_ENABLED = os.environ.get("ENGLISH_CORNER_ENABLED", "true").lower() not in ("false", "0", "")
 
 app = FastAPI(title="施永青「C觀點」文章庫 API")
 
@@ -105,6 +106,9 @@ def get_article(nid: str):
 
 @app.get("/api/article/{nid}/vocab", response_model=list[VocabTerm])
 def get_article_vocab(nid: str):
+    if not ENGLISH_CORNER_ENABLED:
+        raise HTTPException(status_code=404, detail="English Corner disabled")
+
     start = time.monotonic()
     conn = db.connect(DB_PATH)
     try:
