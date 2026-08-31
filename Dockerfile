@@ -13,7 +13,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY db.py server.py sync_articles.py migrate_to_sqlite.py download_am730_column.py ./
+COPY db.py server.py sync_articles.py migrate_to_sqlite.py download_am730_column.py vocab.py ./
 COPY articles.db ./
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 COPY docker-entrypoint.sh ./
