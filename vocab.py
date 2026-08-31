@@ -21,8 +21,8 @@ Article body:
 
 Pick 6 to 10 English words or phrases worth learning from this article: concepts, terms, or proper nouns (including Cantonese-transliterated names) tied to its subject matter. Skip vocabulary a learner would already know.
 
-Respond with ONLY a JSON array, no other text, in this exact shape:
-[{{"term": "English word or phrase", "pos": "part of speech", "ipa": "/IPA pronunciation/", "zh": "the corresponding Chinese term or name from the article", "example": "one natural English sentence using the term, related to the article's topic"}}]
+Respond with ONLY a JSON array, no other text, in this exact shape. The "zh" field must be written in Traditional Chinese (繁體中文), matching the article's own script — never Simplified Chinese:
+[{{"term": "English word or phrase", "pos": "part of speech", "ipa": "/IPA pronunciation/", "zh": "the corresponding Traditional Chinese term or name from the article", "example": "one natural English sentence using the term, related to the article's topic"}}]
 """
 
 

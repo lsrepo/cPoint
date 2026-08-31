@@ -118,7 +118,13 @@ a { color: var(--accent); text-decoration: underline; text-underline-offset: .2e
 }
 .article-nav-prev { text-align: left; }
 .article-nav-next { text-align: right; }
-.vocab-corner { margin-top: 2rem; font-size: 1rem; }
+.vocab-corner {
+  margin-top: 2rem;
+  font-size: 1rem;
+  border: 1px solid var(--fg);
+  border-radius: 6px;
+  padding: 1.2rem 1.4rem;
+}
 .vocab-corner-title {
   font-size: .95rem;
   font-weight: 600;
