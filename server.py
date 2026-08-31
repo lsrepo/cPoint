@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """FastAPI backend: JSON API backed by articles.db, plus a static mount
 for the built React frontend (frontend/dist, once it exists)."""
+import logging
 import os
+import time
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -13,6 +15,8 @@ import db
 import vocab
 
 load_dotenv()
+
+logger = logging.getLogger("uvicorn.error")
 
 DB_PATH = db.DB_PATH
 FRONTEND_DIST = os.path.join("frontend", "dist")
@@ -101,6 +105,7 @@ def get_article(nid: str):
 
 @app.get("/api/article/{nid}/vocab", response_model=list[VocabTerm])
 def get_article_vocab(nid: str):
+    start = time.monotonic()
     conn = db.connect(DB_PATH)
     try:
         article = db.get_article(conn, nid)
@@ -109,13 +114,22 @@ def get_article_vocab(nid: str):
 
         cached = db.get_vocab_cache(conn, nid)
         if cached is not None:
+            logger.info("vocab nid=%s cache_hit latency=%.3fs", nid, time.monotonic() - start)
             return cached
 
         try:
             terms = vocab.generate_vocab(article["title"], article["body"])
         except vocab.VocabError as e:
+            logger.warning(
+                "vocab nid=%s generation_failed latency=%.3fs error=%s",
+                nid, time.monotonic() - start, e,
+            )
             raise HTTPException(status_code=502, detail=str(e)) from e
 
+        logger.info(
+            "vocab nid=%s generated latency=%.3fs terms=%d",
+            nid, time.monotonic() - start, len(terms),
+        )
         db.save_vocab_cache(conn, nid, terms)
         return terms
     finally:
