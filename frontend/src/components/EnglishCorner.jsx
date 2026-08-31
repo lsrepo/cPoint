@@ -54,7 +54,19 @@ export default function EnglishCorner({ nid }) {
               )}
               <span className="vocab-zh">對應：{t.zh}</span>
             </div>
-            <p className="vocab-example">{t.example}</p>
+            <p className="vocab-example">
+              {t.example}
+              {speechSupported && (
+                <button
+                  type="button"
+                  className="vocab-play-btn vocab-play-btn-example"
+                  aria-label={`播放例句：${t.example}`}
+                  onClick={() => speak(t.example)}
+                >
+                  播放
+                </button>
+              )}
+            </p>
           </li>
         ))}
       </ul>

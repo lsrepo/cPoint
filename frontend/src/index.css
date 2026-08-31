@@ -153,4 +153,5 @@ a { color: var(--accent); text-decoration: underline; text-underline-offset: .2e
   cursor: pointer;
 }
 .vocab-play-btn:hover { background: var(--tag-bg-hover); }
+.vocab-play-btn-example { margin-left: .5rem; vertical-align: middle; }
 .vocab-example { margin: .35rem 0 0; color: var(--fg); font-size: .95rem; }
