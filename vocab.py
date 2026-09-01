@@ -21,9 +21,36 @@ Article body:
 
 Pick 6 to 10 English words or phrases worth learning from this article: concepts, terms, or proper nouns (including Cantonese-transliterated names) tied to its subject matter. Skip vocabulary a learner would already know.
 
-Respond with ONLY a JSON array, no other text, in this exact shape. The "zh" field must be written in Traditional Chinese (繁體中文), matching the article's own script — never Simplified Chinese:
-[{{"term": "English word or phrase", "pos": "part of speech", "ipa": "/IPA pronunciation/", "zh": "the corresponding Traditional Chinese term or name from the article", "example": "one natural English sentence using the term, related to the article's topic"}}]
+Respond with ONLY a JSON object, no other text, in this exact shape. The "zh" field must be written in Traditional Chinese (繁體中文), matching the article's own script — never Simplified Chinese:
+{{"terms": [{{"term": "English word or phrase", "pos": "part of speech", "ipa": "/IPA pronunciation/", "zh": "the corresponding Traditional Chinese term or name from the article", "example": "one natural English sentence using the term, related to the article's topic"}}]}}
 """
+
+# Requested via response_format below for models/providers that honor it
+# (constrains generation so it can't produce malformed JSON in the first
+# place). Kept as a plain dict, not enforced client-side — parse_terms
+# still has to handle providers that ignore response_format entirely.
+VOCAB_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "terms": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "term": {"type": "string"},
+                    "pos": {"type": "string"},
+                    "ipa": {"type": "string"},
+                    "zh": {"type": "string"},
+                    "example": {"type": "string"},
+                },
+                "required": ["term", "pos", "ipa", "zh", "example"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["terms"],
+    "additionalProperties": False,
+}
 
 
 class VocabError(Exception):
@@ -58,6 +85,14 @@ def _request_completion(api_key, model, title, body):
         "max_tokens": 1200,
         "reasoning": {"enabled": False},
         "provider": {"sort": "throughput"},
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "vocab_terms",
+                "strict": True,
+                "schema": VOCAB_JSON_SCHEMA,
+            },
+        },
     }
     try:
         res = httpx.post(
@@ -101,7 +136,19 @@ def parse_terms(content):
 
 
 def _parse_strict(content):
-    """The happy path: content is (or contains) one well-formed JSON array."""
+    """The happy path. Providers that honor response_format return pure
+    JSON matching VOCAB_JSON_SCHEMA — {"terms": [...]}. Providers that
+    ignore it fall back to whatever the prompt asked for, which could
+    still be a bare array (possibly prose-wrapped)."""
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        parsed = None
+    if isinstance(parsed, dict) and isinstance(parsed.get("terms"), list):
+        return _coerce_terms(parsed["terms"])
+    if isinstance(parsed, list):
+        return _coerce_terms(parsed)
+
     match = re.search(r"\[.*\]", content, re.DOTALL)
     if not match:
         return None
@@ -113,11 +160,13 @@ def _parse_strict(content):
 
 
 def _parse_lenient(content):
-    """Fallback for output that's individually valid but not a well-formed
-    array — most commonly a missing closing ']' (observed in practice:
-    the model completes 10 correct objects and just omits it). Recovers
-    whichever top-level {...} objects parse, ignoring the array wrapper
-    entirely."""
+    """Fallback for output that's individually valid but not well-formed
+    overall — most commonly a missing closing bracket (observed in
+    practice: the model completes 10 correct term objects and just omits
+    the array's ']'). Recovers whichever {...} object parses, at any
+    nesting depth, so a term object is found whether it's top-level or
+    nested inside a {"terms": [...]} wrapper; a malformed wrapper object
+    itself just fails _coerce_terms's field check and gets dropped."""
     raw_terms = []
     for obj_str in _extract_json_objects(content):
         try:
@@ -128,11 +177,11 @@ def _parse_lenient(content):
 
 
 def _extract_json_objects(content):
-    """Scan for top-level balanced {...} substrings, string-literal-aware
-    so braces inside quoted text don't throw off the depth count."""
+    """Scan for every balanced {...} substring, at any nesting depth,
+    string-literal-aware so braces inside quoted text don't throw off
+    matching."""
     objects = []
-    depth = 0
-    start = None
+    stack = []
     in_string = False
     escape = False
     for i, ch in enumerate(content):
@@ -147,15 +196,11 @@ def _extract_json_objects(content):
         if ch == '"':
             in_string = True
         elif ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
+            stack.append(i)
         elif ch == "}":
-            if depth > 0:
-                depth -= 1
-                if depth == 0 and start is not None:
-                    objects.append(content[start:i + 1])
-                    start = None
+            if stack:
+                start = stack.pop()
+                objects.append(content[start:i + 1])
     return objects
 
 

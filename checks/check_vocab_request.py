@@ -58,6 +58,8 @@ def main():
         assert sent["max_tokens"] == 1200, sent
         assert sent["reasoning"] == {"enabled": False}, sent
         assert sent["provider"] == {"sort": "throughput"}, sent
+        assert sent["response_format"]["type"] == "json_schema", sent
+        assert sent["response_format"]["json_schema"]["schema"] == vocab.VOCAB_JSON_SCHEMA, sent
         assert timeout == 10, timeout
 
         # Mandatory-reasoning model: first call 400s, must retry without

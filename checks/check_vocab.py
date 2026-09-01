@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Verify vocab.parse_terms handles well-formed, prose-wrapped, and
-malformed model output correctly."""
+"""Verify vocab.parse_terms handles well-formed, prose-wrapped, malformed,
+and response_format-conforming ({"terms": [...]}) model output correctly."""
 import os
 import sys
 
@@ -73,7 +73,25 @@ def main():
     except vocab.VocabError:
         pass
 
-    print("OK: vocab.parse_terms handles clean, wrapped, malformed, and bracket-missing model output")
+    # response_format's requested shape: a pure JSON object, not an array.
+    schema_conforming = (
+        '{"terms": [{"term": "cabinet", "pos": "noun", "ipa": "/kab/", '
+        '"zh": "內閣", "example": "The cabinet met."}]}'
+    )
+    assert vocab.parse_terms(schema_conforming) == terms
+
+    # A provider that partially honors response_format (or ignores it and
+    # wraps in prose) but still omits the terms array's closing bracket —
+    # the wrapper object itself has no term/pos/etc fields and should be
+    # dropped, while the nested term object is still recovered.
+    schema_conforming_missing_bracket = (
+        'Here is the JSON: {"terms": [{"term": "veto", "pos": "noun", '
+        '"ipa": "/v/", "zh": "否決", "example": "x"}'
+    )
+    recovered = vocab.parse_terms(schema_conforming_missing_bracket)
+    assert len(recovered) == 1 and recovered[0]["term"] == "veto", recovered
+
+    print("OK: vocab.parse_terms handles clean, wrapped, malformed, bracket-missing, and schema-conforming model output")
 
 
 if __name__ == "__main__":
