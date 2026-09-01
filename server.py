@@ -119,8 +119,11 @@ def get_article_vocab(nid: str, response: Response):
 
         cached = db.get_vocab_cache(conn, nid)
         if cached is not None:
+            terms, generated_in_seconds = cached
             logger.info("vocab nid=%s cache_hit latency=%.3fs", nid, time.monotonic() - start)
-            return cached
+            if generated_in_seconds is not None:
+                response.headers["X-Vocab-Generated-In"] = f"{generated_in_seconds:.2f}"
+            return terms
 
         try:
             terms = vocab.generate_vocab(article["title"], article["body"])
@@ -134,7 +137,7 @@ def get_article_vocab(nid: str, response: Response):
         elapsed = time.monotonic() - start
         logger.info("vocab nid=%s generated latency=%.3fs terms=%d", nid, elapsed, len(terms))
         response.headers["X-Vocab-Generated-In"] = f"{elapsed:.2f}"
-        db.save_vocab_cache(conn, nid, terms)
+        db.save_vocab_cache(conn, nid, terms, elapsed)
         return terms
     finally:
         conn.close()
