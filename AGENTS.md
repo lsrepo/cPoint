@@ -52,17 +52,68 @@ fetching.
 
 - Run all four: `python3 checks/check_db.py checks/check_migrate.py
   checks/check_sync.py` and (venv active) `checks/check_server.py`.
-- `cd frontend && npm run lint` — expect exactly the two
-  `react(set-state-in-effect)` warnings in components that reset state at
-  the top of a data-loading `useEffect` (`TagFilteredView.jsx`,
-  `ArticleView.jsx`, and now `TagListView.jsx`); that pattern was
-  reviewed and accepted, not a bug to fix.
+- `cd frontend && npm run lint` — expect exactly 7 warnings, all
+  reviewed and accepted, not bugs to fix: 5 `react(set-state-in-effect)`
+  in components that reset state at the top of a data-loading
+  `useEffect` (`TagFilteredView.jsx`, `ArticleView.jsx`,
+  `TagListView.jsx`, `CantoneseAudioPlayer.jsx`, `EnglishCorner.jsx`),
+  plus `react(only-export-components)` in `RandomView.jsx` (shares a
+  constant alongside the component) and `react(refs)` in
+  `ArticleView.jsx` (`paragraphRefs.current = []` reset during render,
+  so each paragraph can push itself in via its own ref callback — needed
+  for the arrow-key paragraph-navigation feature). If the count or set
+  of files changes, that's a real signal worth checking, not just
+  updating this number.
 - If verifying a change through the Docker image, **open a genuinely new
   browser tab**, not a reload of one that was already pointed at
   `localhost:8420`. A rebuilt image serving on the same URL does not
   reliably bust an already-open tab's cached JS bundle — even a forced
   reload can silently keep executing the old bundle. This cost a full
   debugging detour once already.
+
+## English Corner (vocab generation)
+
+`vocab.py` calls an OpenRouter model to extract vocab for
+`/api/article/{nid}/vocab`, gated by `ENGLISH_CORNER_ENABLED` (env var,
+default enabled) and cached per-article in `db.vocab_cache` so each
+article only ever triggers one LLM call.
+
+- **`OPENROUTER_MODEL` differs between local and production on purpose.**
+  Local `.env` (gitignored) sets it to a free model
+  (`nvidia/nemotron-3.5-lightning:free` as of this writing) so local dev
+  doesn't spend the production API key's budget; Dokploy's production env
+  has no `OPENROUTER_MODEL` set, so it falls back to `DEFAULT_MODEL`
+  (`deepseek/deepseek-v4-flash-0731`). Don't be alarmed if local latency
+  looks very different from production — it's a different model, not a
+  regression. Production env vars live in Dokploy itself (dashboard, or
+  its REST-ish API at `/api/<router>.<procedure>` with an `x-api-key`
+  header) — not tracked in this repo.
+- **Reasoning models can silently eat most of the latency budget.**
+  `deepseek-v4-flash-0731` defaults to emitting a hidden "reasoning"
+  scratchpad before its actual answer — one real trace measured 1882 of
+  2348 completion tokens as pure reasoning, turning a ~2s task into 71s.
+  `reasoning: {"enabled": false}` in the request payload fixes this for
+  models that support disabling it. Some free-tier models (e.g.
+  `minimax/minimax-m2.7:free`) reject that toggle outright with a 400
+  "reasoning is mandatory" error, and can't have reasoning capped via
+  `reasoning.max_tokens` either — they'll burn the entire `max_tokens`
+  budget on reasoning and return empty content. `generate_vocab` handles
+  this with a one-time retry (drop the toggle, raise the budget) on that
+  specific 400.
+- **OpenRouter load-balances one model across third-party providers with
+  very different speeds** — one real trace saw 91 tok/s (Reka) vs 18 tok/s
+  (Ambient) for the same model and similar output length. `provider:
+  {"sort": "throughput"}` mitigates this but doesn't guarantee bounded
+  latency (occasional outliers still land past 10s); the route's 10s
+  timeout + existing "hide the section on any non-2xx" frontend behavior
+  is the actual backstop, not a hard latency guarantee.
+- **Testing vocab generation against the real local `articles.db` writes
+  real rows into `db.vocab_cache`** — and that file is checked into git,
+  not gitignored (see Architecture above). Running `generate_vocab`/hitting
+  `/vocab` locally during manual testing will leave a `git diff` on
+  `articles.db`; run `git checkout -- articles.db` before committing if
+  you don't want dev-model-generated cache entries in the repo's
+  source-of-truth DB.
 
 ## Deployment
 

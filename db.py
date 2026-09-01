@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS article_tags (
 CREATE INDEX IF NOT EXISTS idx_articles_date ON articles(date);
 CREATE TABLE IF NOT EXISTS vocab_cache (
     article_nid TEXT PRIMARY KEY REFERENCES articles(nid),
-    terms_json TEXT NOT NULL
+    terms_json TEXT NOT NULL,
+    generated_in_seconds REAL
 );
 """
 
@@ -40,7 +41,18 @@ def connect(db_path=DB_PATH):
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    _migrate_vocab_cache_generated_in_seconds(conn)
     return conn
+
+
+def _migrate_vocab_cache_generated_in_seconds(conn):
+    # SCHEMA's CREATE TABLE IF NOT EXISTS only applies to brand-new DBs;
+    # existing vocab_cache tables (this repo's checked-in articles.db,
+    # and the deployed production DB) predate this column.
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab_cache)")}
+    if "generated_in_seconds" not in cols:
+        conn.execute("ALTER TABLE vocab_cache ADD COLUMN generated_in_seconds REAL")
+        conn.commit()
 
 
 def upsert_article(conn, nid, title, date, url, body, hashtags):
@@ -149,15 +161,19 @@ def get_article(conn, nid):
 
 def get_vocab_cache(conn, nid):
     row = conn.execute(
-        "SELECT terms_json FROM vocab_cache WHERE article_nid = ?", (nid,)
+        "SELECT terms_json, generated_in_seconds FROM vocab_cache WHERE article_nid = ?", (nid,)
     ).fetchone()
-    return json.loads(row[0]) if row else None
+    if row is None:
+        return None
+    terms_json, generated_in_seconds = row
+    return json.loads(terms_json), generated_in_seconds
 
 
-def save_vocab_cache(conn, nid, terms):
+def save_vocab_cache(conn, nid, terms, generated_in_seconds):
     conn.execute(
-        "INSERT INTO vocab_cache (article_nid, terms_json) VALUES (?, ?) "
-        "ON CONFLICT(article_nid) DO UPDATE SET terms_json = excluded.terms_json",
-        (nid, json.dumps(terms, ensure_ascii=False)),
+        "INSERT INTO vocab_cache (article_nid, terms_json, generated_in_seconds) VALUES (?, ?, ?) "
+        "ON CONFLICT(article_nid) DO UPDATE SET "
+        "terms_json = excluded.terms_json, generated_in_seconds = excluded.generated_in_seconds",
+        (nid, json.dumps(terms, ensure_ascii=False), generated_in_seconds),
     )
     conn.commit()
