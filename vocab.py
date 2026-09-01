@@ -46,6 +46,8 @@ def generate_vocab(title, body):
                     {"role": "user", "content": PROMPT_TEMPLATE.format(title=title, body=body)}
                 ],
                 "temperature": 0.4,
+                "max_tokens": 1200,
+                "reasoning": {"enabled": False},
             },
             timeout=30,
         )
