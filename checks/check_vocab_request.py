@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Verify vocab.generate_vocab sends the latency-bounding request params
-(max_tokens cap, reasoning disabled) to OpenRouter. httpx.post is
-monkeypatched so this never hits the network."""
+(max_tokens cap, reasoning disabled, throughput-sorted provider, tight
+timeout) to OpenRouter. httpx.post is monkeypatched so this never hits
+the network."""
 import os
 import sys
 
@@ -34,7 +35,7 @@ def main():
     )
 
     def fake_post(url, headers=None, json=None, timeout=None):
-        calls.append(json)
+        calls.append((json, timeout))
         return FakeResponse({"choices": [{"message": {"content": fake_content}}]})
 
     try:
@@ -45,11 +46,16 @@ def main():
         assert len(terms) == 1, terms
         assert len(calls) == 1, calls
 
-        sent = calls[0]
+        sent, timeout = calls[0]
         assert sent["max_tokens"] == 1200, sent
         assert sent["reasoning"] == {"enabled": False}, sent
+        assert sent["provider"] == {"sort": "throughput"}, sent
+        assert timeout == 10, timeout
 
-        print("OK: vocab.generate_vocab caps max_tokens and disables reasoning")
+        print(
+            "OK: vocab.generate_vocab caps max_tokens, disables reasoning, "
+            "sorts by throughput, and uses a 10s timeout"
+        )
     finally:
         httpx.post = real_post
         if real_api_key is None:

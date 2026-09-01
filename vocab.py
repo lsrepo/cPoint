@@ -48,8 +48,9 @@ def generate_vocab(title, body):
                 "temperature": 0.4,
                 "max_tokens": 1200,
                 "reasoning": {"enabled": False},
+                "provider": {"sort": "throughput"},
             },
-            timeout=30,
+            timeout=10,
         )
         res.raise_for_status()
     except httpx.HTTPError as e:
