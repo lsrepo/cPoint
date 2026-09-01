@@ -36,6 +36,19 @@ def generate_vocab(title, body):
         raise VocabError("OPENROUTER_API_KEY not configured")
     model = os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
 
+    content = _request_completion(api_key, model, title, body)
+    try:
+        return parse_terms(content)
+    except VocabError:
+        # Malformed/incomplete JSON is usually just sampling variance
+        # (temperature 0.4) rather than a systemic issue — a fresh
+        # attempt often succeeds where the first didn't. One retry only;
+        # if this also fails, let the VocabError propagate normally.
+        content = _request_completion(api_key, model, title, body)
+        return parse_terms(content)
+
+
+def _request_completion(api_key, model, title, body):
     payload = {
         "model": model,
         "messages": [
@@ -72,27 +85,83 @@ def generate_vocab(title, body):
         raise VocabError(f"OpenRouter request failed: {e}") from e
 
     try:
-        content = res.json()["choices"][0]["message"]["content"]
+        return res.json()["choices"][0]["message"]["content"]
     except (KeyError, IndexError, ValueError) as e:
         raise VocabError(f"unexpected OpenRouter response shape: {e}") from e
 
-    return parse_terms(content)
-
 
 def parse_terms(content):
+    if content is None:
+        raise VocabError("empty content from model")
+
+    terms = _parse_strict(content) or _parse_lenient(content)
+    if not terms:
+        raise VocabError(f"no valid vocab terms found in model output: {content!r}")
+    return terms
+
+
+def _parse_strict(content):
+    """The happy path: content is (or contains) one well-formed JSON array."""
     match = re.search(r"\[.*\]", content, re.DOTALL)
     if not match:
-        raise VocabError(f"no JSON array found in model output: {content!r}")
+        return None
     try:
         raw_terms = json.loads(match.group(0))
-    except json.JSONDecodeError as e:
-        raise VocabError(f"invalid JSON from model: {e}") from e
+    except json.JSONDecodeError:
+        return None
+    return _coerce_terms(raw_terms)
 
-    terms = [
+
+def _parse_lenient(content):
+    """Fallback for output that's individually valid but not a well-formed
+    array — most commonly a missing closing ']' (observed in practice:
+    the model completes 10 correct objects and just omits it). Recovers
+    whichever top-level {...} objects parse, ignoring the array wrapper
+    entirely."""
+    raw_terms = []
+    for obj_str in _extract_json_objects(content):
+        try:
+            raw_terms.append(json.loads(obj_str))
+        except json.JSONDecodeError:
+            continue
+    return _coerce_terms(raw_terms)
+
+
+def _extract_json_objects(content):
+    """Scan for top-level balanced {...} substrings, string-literal-aware
+    so braces inside quoted text don't throw off the depth count."""
+    objects = []
+    depth = 0
+    start = None
+    in_string = False
+    escape = False
+    for i, ch in enumerate(content):
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    objects.append(content[start:i + 1])
+                    start = None
+    return objects
+
+
+def _coerce_terms(raw_terms):
+    return [
         {field: str(t[field]) for field in REQUIRED_FIELDS}
         for t in raw_terms
         if isinstance(t, dict) and all(field in t for field in REQUIRED_FIELDS)
     ]
-    if not terms:
-        raise VocabError("model output had no valid terms")
-    return terms
