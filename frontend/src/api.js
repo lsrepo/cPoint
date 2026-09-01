@@ -32,5 +32,7 @@ export async function getArticle(nid) {
 export async function getVocab(nid) {
   const res = await fetch(`/api/article/${nid}/vocab`);
   if (!res.ok) throw new Error(`GET /api/article/${nid}/vocab failed: ${res.status}`);
-  return res.json();
+  const terms = await res.json();
+  const generatedIn = res.headers.get("X-Vocab-Generated-In");
+  return { terms, generatedInSeconds: generatedIn === null ? null : Number(generatedIn) };
 }
