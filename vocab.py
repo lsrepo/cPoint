@@ -67,10 +67,11 @@ def generate_vocab(title, body):
     try:
         return parse_terms(content)
     except VocabError:
-        # Malformed/incomplete JSON is usually just sampling variance
-        # (temperature 0.4) rather than a systemic issue — a fresh
-        # attempt often succeeds where the first didn't. One retry only;
-        # if this also fails, let the VocabError propagate normally.
+        # A retry still has real variance to draw on even at temperature
+        # 0: provider.sort=throughput can route the retry to a different
+        # backend than the original call, and different providers serving
+        # "the same" model rarely produce byte-identical output anyway.
+        # One retry only; if this also fails, let VocabError propagate.
         content = _request_completion(api_key, model, title, body)
         return parse_terms(content)
 
@@ -81,7 +82,7 @@ def _request_completion(api_key, model, title, body):
         "messages": [
             {"role": "user", "content": PROMPT_TEMPLATE.format(title=title, body=body)}
         ],
-        "temperature": 0.4,
+        "temperature": 0,
         "max_tokens": 1200,
         "reasoning": {"enabled": False},
         "provider": {"sort": "throughput"},
