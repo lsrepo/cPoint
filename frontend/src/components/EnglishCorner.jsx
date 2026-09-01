@@ -11,13 +11,19 @@ function speak(text) {
 
 export default function EnglishCorner({ nid }) {
   const [terms, setTerms] = useState(undefined);
+  const [generatedInSeconds, setGeneratedInSeconds] = useState(null);
   const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
   useEffect(() => {
     setTerms(undefined);
+    setGeneratedInSeconds(null);
     let cancelled = false;
     getVocab(nid)
-      .then((data) => { if (!cancelled) setTerms(data); })
+      .then(({ terms, generatedInSeconds }) => {
+        if (cancelled) return;
+        setTerms(terms);
+        setGeneratedInSeconds(generatedInSeconds);
+      })
       .catch(() => { if (!cancelled) setTerms([]); });
     return () => { cancelled = true; };
   }, [nid]);
@@ -34,7 +40,14 @@ export default function EnglishCorner({ nid }) {
 
   return (
     <section className="vocab-corner">
-      <h2 className="vocab-corner-title">英文學習角</h2>
+      <div className="vocab-corner-head">
+        <h2 className="vocab-corner-title">英文學習角</h2>
+        {generatedInSeconds !== null && (
+          <span className="vocab-corner-timing" title="AI 生成生字所需時間">
+            {generatedInSeconds.toFixed(1)}s
+          </span>
+        )}
+      </div>
       <ul className="vocab-list">
         {terms.map((t) => (
           <li key={t.term} className="vocab-item">

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Verify the /api/article/{nid}/vocab route: cache-miss calls the LLM
-exactly once, cache-hit skips it, and LLM failure surfaces as a 502.
-vocab.generate_vocab is monkeypatched so this never hits the network."""
+exactly once, cache-hit skips it, LLM failure surfaces as a 502, and the
+X-Vocab-Generated-In timing header is set only on a fresh generation, not
+on a cache hit. vocab.generate_vocab is monkeypatched so this never hits
+the network."""
 import os
 import sys
 import tempfile
@@ -47,11 +49,13 @@ def main():
         assert res.status_code == 200
         assert res.json() == fake_terms, res.json()
         assert len(calls) == 1, calls
+        assert "X-Vocab-Generated-In" in res.headers, "fresh generation should report timing"
 
         res = client.get("/api/article/1/vocab")
         assert res.status_code == 200
         assert res.json() == fake_terms
         assert len(calls) == 1, "second request should hit the cache, not the LLM"
+        assert "X-Vocab-Generated-In" not in res.headers, "cache hit should not report timing"
 
         res = client.get("/api/article/999/vocab")
         assert res.status_code == 404

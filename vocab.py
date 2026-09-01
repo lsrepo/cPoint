@@ -36,21 +36,37 @@ def generate_vocab(title, body):
         raise VocabError("OPENROUTER_API_KEY not configured")
     model = os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL)
 
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": PROMPT_TEMPLATE.format(title=title, body=body)}
+        ],
+        "temperature": 0.4,
+        "max_tokens": 1200,
+        "reasoning": {"enabled": False},
+        "provider": {"sort": "throughput"},
+    }
     try:
         res = httpx.post(
             OPENROUTER_URL,
             headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "user", "content": PROMPT_TEMPLATE.format(title=title, body=body)}
-                ],
-                "temperature": 0.4,
-                "max_tokens": 1200,
-                "reasoning": {"enabled": False},
-            },
-            timeout=30,
+            json=payload,
+            timeout=10,
         )
+        if res.status_code == 400 and "reasoning is mandatory" in res.text.lower():
+            # Some free-tier models can't have reasoning disabled and burn
+            # 2000+ tokens on it regardless of any reasoning.max_tokens cap
+            # — drop the toggle and retry with enough budget for both the
+            # reasoning and the actual answer, and a timeout to match
+            # (observed ~30-40s for minimax-m2.7:free).
+            del payload["reasoning"]
+            payload["max_tokens"] = 4000
+            res = httpx.post(
+                OPENROUTER_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+                timeout=60,
+            )
         res.raise_for_status()
     except httpx.HTTPError as e:
         raise VocabError(f"OpenRouter request failed: {e}") from e

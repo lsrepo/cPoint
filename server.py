@@ -6,7 +6,7 @@ import os
 import time
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -29,6 +29,7 @@ app.add_middleware(
     allow_origins=["http://localhost:5173"],  # Vite dev server
     allow_methods=["GET"],
     allow_headers=["*"],
+    expose_headers=["X-Vocab-Generated-In"],
 )
 
 
@@ -105,7 +106,7 @@ def get_article(nid: str):
 
 
 @app.get("/api/article/{nid}/vocab", response_model=list[VocabTerm])
-def get_article_vocab(nid: str):
+def get_article_vocab(nid: str, response: Response):
     if not ENGLISH_CORNER_ENABLED:
         raise HTTPException(status_code=404, detail="English Corner disabled")
 
@@ -130,10 +131,9 @@ def get_article_vocab(nid: str):
             )
             raise HTTPException(status_code=502, detail=str(e)) from e
 
-        logger.info(
-            "vocab nid=%s generated latency=%.3fs terms=%d",
-            nid, time.monotonic() - start, len(terms),
-        )
+        elapsed = time.monotonic() - start
+        logger.info("vocab nid=%s generated latency=%.3fs terms=%d", nid, elapsed, len(terms))
+        response.headers["X-Vocab-Generated-In"] = f"{elapsed:.2f}"
         db.save_vocab_cache(conn, nid, terms)
         return terms
     finally:
