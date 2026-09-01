@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Verify vocab.parse_terms handles well-formed, prose-wrapped, and
-malformed model output correctly."""
+"""Verify vocab.parse_terms handles well-formed, prose-wrapped, malformed,
+and response_format-conforming ({"terms": [...]}) model output correctly."""
 import os
 import sys
 
@@ -44,7 +44,54 @@ def main():
     )
     assert len(vocab.parse_terms(mixed_valid)) == 1
 
-    print("OK: vocab.parse_terms handles clean, wrapped, and malformed model output")
+    # Observed in production: the model completes every object correctly
+    # but omits the array's closing ']'. The strict array-regex path can't
+    # match this at all (no closing bracket anywhere), but every object is
+    # individually valid and should still be recovered.
+    missing_closing_bracket = (
+        '[\n{"term": "veto", "pos": "noun", "ipa": "/v/", "zh": "否決", "example": "x"},\n'
+        '{"term": "cabinet", "pos": "noun", "ipa": "/kab/", "zh": "內閣", "example": "y"}'
+    )
+    recovered = vocab.parse_terms(missing_closing_bracket)
+    assert len(recovered) == 2, recovered
+    assert recovered[0]["term"] == "veto" and recovered[1]["term"] == "cabinet", recovered
+
+    # Braces inside a string value (e.g. an example sentence quoting code
+    # or JSON) shouldn't throw off the lenient path's depth tracking.
+    brace_in_string_value = (
+        '[{"term": "veto", "pos": "noun", "ipa": "/v/", "zh": "否決", '
+        '"example": "She said \\"use {curly braces}\\" in the example."}'
+    )
+    recovered = vocab.parse_terms(brace_in_string_value)
+    assert len(recovered) == 1 and recovered[0]["term"] == "veto", recovered
+
+    # Truly empty/garbage output still raises, even with the lenient path.
+    garbage = "I cannot complete this request."
+    try:
+        vocab.parse_terms(garbage)
+        assert False, "expected VocabError for garbage output"
+    except vocab.VocabError:
+        pass
+
+    # response_format's requested shape: a pure JSON object, not an array.
+    schema_conforming = (
+        '{"terms": [{"term": "cabinet", "pos": "noun", "ipa": "/kab/", '
+        '"zh": "內閣", "example": "The cabinet met."}]}'
+    )
+    assert vocab.parse_terms(schema_conforming) == terms
+
+    # A provider that partially honors response_format (or ignores it and
+    # wraps in prose) but still omits the terms array's closing bracket —
+    # the wrapper object itself has no term/pos/etc fields and should be
+    # dropped, while the nested term object is still recovered.
+    schema_conforming_missing_bracket = (
+        'Here is the JSON: {"terms": [{"term": "veto", "pos": "noun", '
+        '"ipa": "/v/", "zh": "否決", "example": "x"}'
+    )
+    recovered = vocab.parse_terms(schema_conforming_missing_bracket)
+    assert len(recovered) == 1 and recovered[0]["term"] == "veto", recovered
+
+    print("OK: vocab.parse_terms handles clean, wrapped, malformed, bracket-missing, and schema-conforming model output")
 
 
 if __name__ == "__main__":
