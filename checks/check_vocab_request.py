@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Verify vocab.generate_vocab sends the latency-bounding request params
 (max_tokens cap, reasoning disabled, throughput-sorted provider, tight
-timeout) to OpenRouter. httpx.post is monkeypatched so this never hits
-the network."""
+timeout) to OpenRouter, and that it falls back correctly for models that
+reject a disabled reasoning toggle. httpx.post is monkeypatched so this
+never hits the network."""
 import os
 import sys
 
@@ -14,18 +15,20 @@ import vocab
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200, text=""):
         self._payload = payload
+        self.status_code = status_code
+        self.text = text
 
     def raise_for_status(self):
-        pass
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError("error", request=None, response=self)
 
     def json(self):
         return self._payload
 
 
 def main():
-    calls = []
     real_post = httpx.post
     real_api_key = os.environ.get("OPENROUTER_API_KEY")
 
@@ -33,15 +36,19 @@ def main():
         '[{"term": "cabinet", "pos": "noun", "ipa": "/kab/", '
         '"zh": "內閣", "example": "The cabinet met."}]'
     )
-
-    def fake_post(url, headers=None, json=None, timeout=None):
-        calls.append((json, timeout))
-        return FakeResponse({"choices": [{"message": {"content": fake_content}}]})
+    fake_ok = FakeResponse({"choices": [{"message": {"content": fake_content}}]})
 
     try:
         os.environ["OPENROUTER_API_KEY"] = "test-key"
-        httpx.post = fake_post
 
+        # Normal path: single request, latency-bounding params present.
+        calls = []
+
+        def fake_post_ok(url, headers=None, json=None, timeout=None):
+            calls.append((dict(json), timeout))
+            return fake_ok
+
+        httpx.post = fake_post_ok
         terms = vocab.generate_vocab("Title", "Body")
         assert len(terms) == 1, terms
         assert len(calls) == 1, calls
@@ -52,9 +59,35 @@ def main():
         assert sent["provider"] == {"sort": "throughput"}, sent
         assert timeout == 10, timeout
 
+        # Mandatory-reasoning model: first call 400s, must retry without
+        # the reasoning toggle and with a larger token/timeout budget.
+        calls = []
+        fake_400 = FakeResponse(
+            {"error": {"message": "Reasoning is mandatory for this endpoint"}},
+            status_code=400,
+            text='{"error":{"message":"Reasoning is mandatory for this endpoint and cannot be disabled."}}',
+        )
+
+        def fake_post_retry(url, headers=None, json=None, timeout=None):
+            calls.append((dict(json), timeout))
+            return fake_400 if len(calls) == 1 else fake_ok
+
+        httpx.post = fake_post_retry
+        terms = vocab.generate_vocab("Title", "Body")
+        assert len(terms) == 1, terms
+        assert len(calls) == 2, calls
+
+        first_sent, first_timeout = calls[0]
+        assert first_sent["reasoning"] == {"enabled": False}, first_sent
+        retry_sent, retry_timeout = calls[1]
+        assert "reasoning" not in retry_sent, retry_sent
+        assert retry_sent["max_tokens"] == 4000, retry_sent
+        assert retry_timeout == 60, retry_timeout
+
         print(
             "OK: vocab.generate_vocab caps max_tokens, disables reasoning, "
-            "sorts by throughput, and uses a 10s timeout"
+            "sorts by throughput, uses a 10s timeout, and falls back "
+            "correctly for mandatory-reasoning models"
         )
     finally:
         httpx.post = real_post
