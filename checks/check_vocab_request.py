@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Verify vocab.generate_vocab sends the latency-bounding request params
 (max_tokens cap, reasoning disabled, throughput-sorted provider, tight
-timeout) to OpenRouter, and that it falls back correctly for models that
-reject a disabled reasoning toggle. httpx.post is monkeypatched so this
-never hits the network."""
+timeout) to OpenRouter, falls back correctly for models that reject a
+disabled reasoning toggle, and retries once (a fresh request, not just a
+re-parse) when the model's output fails to parse. httpx.post is
+monkeypatched so this never hits the network."""
 import os
 import sys
 
@@ -84,10 +85,43 @@ def main():
         assert retry_sent["max_tokens"] == 4000, retry_sent
         assert retry_timeout == 60, retry_timeout
 
+        # Unparseable output (e.g. missing bracket, or genuinely no
+        # recoverable terms) triggers exactly one fresh request+parse
+        # retry, not just a re-parse of the same bad content.
+        calls = []
+        fake_garbage = FakeResponse(
+            {"choices": [{"message": {"content": "I cannot help with that."}}]}
+        )
+
+        def fake_post_garbage_then_ok(url, headers=None, json=None, timeout=None):
+            calls.append(1)
+            return fake_garbage if len(calls) == 1 else fake_ok
+
+        httpx.post = fake_post_garbage_then_ok
+        terms = vocab.generate_vocab("Title", "Body")
+        assert len(terms) == 1, terms
+        assert len(calls) == 2, "should retry once on a parse failure, not give up immediately"
+
+        # And it doesn't retry forever — two consecutive parse failures
+        # should raise, not loop.
+        calls = []
+
+        def fake_post_always_garbage(url, headers=None, json=None, timeout=None):
+            calls.append(1)
+            return fake_garbage
+
+        httpx.post = fake_post_always_garbage
+        try:
+            vocab.generate_vocab("Title", "Body")
+            assert False, "expected VocabError when both attempts fail to parse"
+        except vocab.VocabError:
+            pass
+        assert len(calls) == 2, "should stop after exactly one retry, not loop"
+
         print(
             "OK: vocab.generate_vocab caps max_tokens, disables reasoning, "
-            "sorts by throughput, uses a 10s timeout, and falls back "
-            "correctly for mandatory-reasoning models"
+            "sorts by throughput, uses a 10s timeout, falls back correctly "
+            "for mandatory-reasoning models, and retries once on a parse failure"
         )
     finally:
         httpx.post = real_post
