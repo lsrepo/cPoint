@@ -135,6 +135,17 @@ pattern, not what the table actually is.)
   `/vocab`; the sync only persists what already happened. Scheduled 1h
   before the article sync (21:00 UTC vs 22:00 UTC) so the two workflows'
   commit-and-push steps never race each other on `articles.db`.
+- **`cpoint.paklau.com` is Cloudflare-proxied**, and Cloudflare's Bot
+  Fight Mode blocklists `urllib`'s default `Python-urllib/x.y`
+  User-Agent with a bare 403 — this killed `sync-vocab-cache`'s first
+  scheduled run in production. Confirmed narrow: it's that one exact
+  signature, not a broad non-browser or GitHub-Actions-IP/ASN block —
+  `curl`'s default UA and even `python-requests/...` both pass fine.
+  `sync_vocab.py`'s `fetch_export` sets an explicit `User-Agent` for this
+  reason; if a future script also calls `cpoint.paklau.com` from
+  `urllib.request` directly (rather than through `download_am730_column.py`,
+  which already sets a browser UA for the unrelated reason of not getting
+  blocked by the *source* am730 site), it needs the same treatment.
 
 ## Deployment
 

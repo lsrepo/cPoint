@@ -14,9 +14,17 @@ import db
 
 DEFAULT_EXPORT_URL = "https://cpoint.paklau.com/api/admin/vocab"
 
+# cpoint.paklau.com is Cloudflare-proxied, and Cloudflare's Bot Fight Mode
+# specifically blocklists urllib's default "Python-urllib/x.y" User-Agent
+# with a 403 (confirmed: any other UA, even "python-requests/...", passes
+# fine — this isn't an IP/ASN block on GitHub Actions' runners, just that
+# one signature). This is what killed this workflow's first scheduled run.
+USER_AGENT = "cPoint-vocab-sync/1.0 (+https://github.com/lsrepo/cPoint)"
+
 
 def fetch_export(export_url):
-    with urllib.request.urlopen(export_url, timeout=30) as res:
+    req = urllib.request.Request(export_url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=30) as res:
         return json.load(res)
 
 
