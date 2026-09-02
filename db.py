@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS article_tags (
     PRIMARY KEY (article_nid, tag_id)
 );
 CREATE INDEX IF NOT EXISTS idx_articles_date ON articles(date);
-CREATE TABLE IF NOT EXISTS vocab_cache (
+CREATE TABLE IF NOT EXISTS vocab (
     article_nid TEXT PRIMARY KEY REFERENCES articles(nid),
     terms_json TEXT NOT NULL,
     generated_in_seconds REAL
@@ -40,18 +40,36 @@ TAGS_SUBQUERY = """
 def connect(db_path=DB_PATH):
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
+    _migrate_vocab_cache_table_rename(conn)
     conn.executescript(SCHEMA)
-    _migrate_vocab_cache_generated_in_seconds(conn)
+    _migrate_vocab_generated_in_seconds(conn)
     return conn
 
 
-def _migrate_vocab_cache_generated_in_seconds(conn):
+def _migrate_vocab_cache_table_rename(conn):
+    # Must run before executescript(SCHEMA) below: SCHEMA's CREATE TABLE IF
+    # NOT EXISTS vocab would otherwise create a fresh empty `vocab` table
+    # first, and ALTER TABLE ... RENAME TO then fails because the target
+    # name is already taken. Existing DBs (this repo's checked-in
+    # articles.db, and the deployed production DB) predate this rename —
+    # it was originally named vocab_cache, which in hindsight described the
+    # access pattern (avoid recomputing an LLM call) rather than what it
+    # actually is from the DB's own perspective: just a table of rows, no
+    # TTL or eviction, keyed by article_nid.
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    if "vocab_cache" in tables and "vocab" not in tables:
+        conn.execute("ALTER TABLE vocab_cache RENAME TO vocab")
+        conn.commit()
+
+
+def _migrate_vocab_generated_in_seconds(conn):
     # SCHEMA's CREATE TABLE IF NOT EXISTS only applies to brand-new DBs;
-    # existing vocab_cache tables (this repo's checked-in articles.db,
-    # and the deployed production DB) predate this column.
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab_cache)")}
+    # some existing `vocab` tables (freshly renamed from vocab_cache above,
+    # on a DB from before generated_in_seconds was added) predate this
+    # column.
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(vocab)")}
     if "generated_in_seconds" not in cols:
-        conn.execute("ALTER TABLE vocab_cache ADD COLUMN generated_in_seconds REAL")
+        conn.execute("ALTER TABLE vocab ADD COLUMN generated_in_seconds REAL")
         conn.commit()
 
 
@@ -159,9 +177,9 @@ def get_article(conn, nid):
     }
 
 
-def get_vocab_cache(conn, nid):
+def get_vocab(conn, nid):
     row = conn.execute(
-        "SELECT terms_json, generated_in_seconds FROM vocab_cache WHERE article_nid = ?", (nid,)
+        "SELECT terms_json, generated_in_seconds FROM vocab WHERE article_nid = ?", (nid,)
     ).fetchone()
     if row is None:
         return None
@@ -169,9 +187,9 @@ def get_vocab_cache(conn, nid):
     return json.loads(terms_json), generated_in_seconds
 
 
-def save_vocab_cache(conn, nid, terms, generated_in_seconds):
+def save_vocab(conn, nid, terms, generated_in_seconds):
     conn.execute(
-        "INSERT INTO vocab_cache (article_nid, terms_json, generated_in_seconds) VALUES (?, ?, ?) "
+        "INSERT INTO vocab (article_nid, terms_json, generated_in_seconds) VALUES (?, ?, ?) "
         "ON CONFLICT(article_nid) DO UPDATE SET "
         "terms_json = excluded.terms_json, generated_in_seconds = excluded.generated_in_seconds",
         (nid, json.dumps(terms, ensure_ascii=False), generated_in_seconds),

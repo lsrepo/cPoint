@@ -117,7 +117,7 @@ def get_article_vocab(nid: str, response: Response):
         if article is None:
             raise HTTPException(status_code=404, detail="not found")
 
-        cached = db.get_vocab_cache(conn, nid)
+        cached = db.get_vocab(conn, nid)
         if cached is not None:
             terms, generated_in_seconds = cached
             logger.info("vocab nid=%s cache_hit latency=%.3fs", nid, time.monotonic() - start)
@@ -137,7 +137,7 @@ def get_article_vocab(nid: str, response: Response):
         elapsed = time.monotonic() - start
         logger.info("vocab nid=%s generated latency=%.3fs terms=%d", nid, elapsed, len(terms))
         response.headers["X-Vocab-Generated-In"] = f"{elapsed:.2f}"
-        db.save_vocab_cache(conn, nid, terms, elapsed)
+        db.save_vocab(conn, nid, terms, elapsed)
         return terms
     finally:
         conn.close()

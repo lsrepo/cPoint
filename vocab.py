@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """On-the-fly English vocabulary extraction for an article body, via a free
-model on OpenRouter. Results are cached by server.py in db.vocab_cache so
-each article only triggers one LLM call."""
+model on OpenRouter. Results are stored by server.py in the db.vocab
+table so each article only triggers one LLM call."""
 import json
 import os
 import re

@@ -75,8 +75,11 @@ fetching.
 
 `vocab.py` calls an OpenRouter model to extract vocab for
 `/api/article/{nid}/vocab`, gated by `ENGLISH_CORNER_ENABLED` (env var,
-default enabled) and cached per-article in `db.vocab_cache` so each
-article only ever triggers one LLM call.
+default enabled) and stored per-article in the `db.vocab` table so each
+article only ever triggers one LLM call. (Named `vocab`, not
+`vocab_cache` — from the DB's own perspective it's just permanent rows
+keyed by `article_nid`, no TTL or eviction; "cache" described the access
+pattern, not what the table actually is.)
 
 - **`OPENROUTER_MODEL` differs between local and production on purpose.**
   Local `.env` (gitignored) sets it to a free model
@@ -108,12 +111,15 @@ article only ever triggers one LLM call.
   timeout + existing "hide the section on any non-2xx" frontend behavior
   is the actual backstop, not a hard latency guarantee.
 - **Testing vocab generation against the real local `articles.db` writes
-  real rows into `db.vocab_cache`** — and that file is checked into git,
-  not gitignored (see Architecture above). Running `generate_vocab`/hitting
+  real rows into `db.vocab`** — and that file is checked into git, not
+  gitignored (see Architecture above). Running `generate_vocab`/hitting
   `/vocab` locally during manual testing will leave a `git diff` on
   `articles.db`; run `git checkout -- articles.db` before committing if
-  you don't want dev-model-generated cache entries in the repo's
-  source-of-truth DB.
+  you don't want dev-model-generated rows in the repo's source-of-truth
+  DB. (`db.connect()` also self-migrates the table on every call — even
+  read-only testing that never generates anything can still touch the
+  file if it's connecting to a pre-rename DB with the old `vocab_cache`
+  name.)
 
 ## Deployment
 

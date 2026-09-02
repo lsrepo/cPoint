@@ -2,6 +2,7 @@
 """Verify db.py's schema and query helpers, using an isolated temporary
 database. No network access, fully deterministic."""
 import os
+import sqlite3
 import sys
 import tempfile
 
@@ -83,11 +84,77 @@ def main():
         assert article["title"] == "Title A (edited)"
         assert article["hashtags"] == ["tag3"], article["hashtags"]
 
+        # get_vocab/save_vocab round trip
+        assert db.get_vocab(conn, "1") is None
+        terms = [{"term": "cabinet", "pos": "noun", "ipa": "/kab/", "zh": "內閣", "example": "x"}]
+        db.save_vocab(conn, "1", terms, 3.5)
+        assert db.get_vocab(conn, "1") == (terms, 3.5)
+        # re-saving replaces rather than accumulating
+        terms2 = [{"term": "veto", "pos": "noun", "ipa": "/v/", "zh": "否決", "example": "y"}]
+        db.save_vocab(conn, "1", terms2, 1.2)
+        assert db.get_vocab(conn, "1") == (terms2, 1.2)
+
         conn.close()
         print("OK: db.py schema and query helpers behave correctly")
     finally:
         if os.path.exists(path):
             os.remove(path)
+
+    _check_vocab_cache_rename_migration()
+
+
+def _check_vocab_cache_rename_migration():
+    """db.connect() must transparently migrate a pre-rename DB (table still
+    named vocab_cache, as this repo's articles.db and the deployed
+    production DB were before the vocab_cache -> vocab rename) to the
+    current schema, in both possible starting states: with and without
+    the generated_in_seconds column (added in an earlier migration)."""
+    for has_generated_in_seconds in (False, True):
+        fd, path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        os.remove(path)
+        try:
+            raw = sqlite3.connect(path)
+            cols = "article_nid TEXT PRIMARY KEY, terms_json TEXT NOT NULL"
+            if has_generated_in_seconds:
+                cols += ", generated_in_seconds REAL"
+            raw.execute(f"CREATE TABLE vocab_cache ({cols})")
+            if has_generated_in_seconds:
+                raw.execute(
+                    "INSERT INTO vocab_cache VALUES (?, ?, ?)",
+                    ("1", '[{"term": "cabinet"}]', 4.2),
+                )
+            else:
+                raw.execute(
+                    "INSERT INTO vocab_cache (article_nid, terms_json) VALUES (?, ?)",
+                    ("1", '[{"term": "cabinet"}]'),
+                )
+            raw.commit()
+            raw.close()
+
+            conn = db.connect(path)
+            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            assert "vocab" in tables and "vocab_cache" not in tables, tables
+
+            terms_json, generated_in_seconds = conn.execute(
+                "SELECT terms_json, generated_in_seconds FROM vocab WHERE article_nid = '1'"
+            ).fetchone()
+            assert terms_json == '[{"term": "cabinet"}]', terms_json
+            if has_generated_in_seconds:
+                assert generated_in_seconds == 4.2, generated_in_seconds
+            else:
+                assert generated_in_seconds is None, generated_in_seconds
+
+            conn.close()
+
+            # connect() must also be idempotent — running the migration
+            # again against an already-migrated DB shouldn't error.
+            db.connect(path).close()
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    print("OK: db.connect() migrates a pre-rename vocab_cache table to vocab, with or without generated_in_seconds")
 
 
 if __name__ == "__main__":
