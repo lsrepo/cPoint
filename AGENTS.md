@@ -50,8 +50,10 @@ fetching.
 
 ## Before claiming something works
 
-- Run all four: `python3 checks/check_db.py checks/check_migrate.py
-  checks/check_sync.py` and (venv active) `checks/check_server.py`.
+- Run all: `python3 checks/check_db.py checks/check_migrate.py
+  checks/check_sync.py checks/check_sync_vocab.py` and (venv active)
+  `checks/check_server.py checks/check_vocab.py
+  checks/check_vocab_request.py checks/check_server_vocab.py`.
 - `cd frontend && npm run lint` — expect exactly 7 warnings, all
   reviewed and accepted, not bugs to fix: 5 `react(set-state-in-effect)`
   in components that reset state at the top of a data-loading
@@ -75,8 +77,11 @@ fetching.
 
 `vocab.py` calls an OpenRouter model to extract vocab for
 `/api/article/{nid}/vocab`, gated by `ENGLISH_CORNER_ENABLED` (env var,
-default enabled) and cached per-article in `db.vocab_cache` so each
-article only ever triggers one LLM call.
+default enabled) and stored per-article in the `db.vocab` table so each
+article only ever triggers one LLM call. (Named `vocab`, not
+`vocab_cache` — from the DB's own perspective it's just permanent rows
+keyed by `article_nid`, no TTL or eviction; "cache" described the access
+pattern, not what the table actually is.)
 
 - **`OPENROUTER_MODEL` differs between local and production on purpose.**
   Local `.env` (gitignored) sets it to a free model
@@ -108,12 +113,28 @@ article only ever triggers one LLM call.
   timeout + existing "hide the section on any non-2xx" frontend behavior
   is the actual backstop, not a hard latency guarantee.
 - **Testing vocab generation against the real local `articles.db` writes
-  real rows into `db.vocab_cache`** — and that file is checked into git,
-  not gitignored (see Architecture above). Running `generate_vocab`/hitting
+  real rows into `db.vocab`** — and that file is checked into git, not
+  gitignored (see Architecture above). Running `generate_vocab`/hitting
   `/vocab` locally during manual testing will leave a `git diff` on
   `articles.db`; run `git checkout -- articles.db` before committing if
-  you don't want dev-model-generated cache entries in the repo's
-  source-of-truth DB.
+  you don't want dev-model-generated rows in the repo's source-of-truth
+  DB. (`db.connect()` also self-migrates the table on every call — even
+  read-only testing that never generates anything can still touch the
+  file if it's connecting to a pre-rename DB with the old `vocab_cache`
+  name.)
+- **On-demand generation, but durably persisted**: production's
+  `articles.db` is baked into the Docker image (see Deployment below),
+  so a `vocab` row generated for a real visitor only lives in that
+  running container's writable layer and is wiped on the next redeploy.
+  `sync_vocab.py` + `.github/workflows/sync-vocab-cache.yml` closes that
+  gap — daily, it pulls everything currently cached from the live
+  `/api/admin/vocab` export endpoint and merges it into the checked-in
+  `articles.db`, same commit-and-push-if-changed pattern as
+  `sync_articles.py`. This is still zero precomputation: nothing is ever
+  generated except in direct response to an actual visitor hitting
+  `/vocab`; the sync only persists what already happened. Scheduled 1h
+  before the article sync (21:00 UTC vs 22:00 UTC) so the two workflows'
+  commit-and-push steps never race each other on `articles.db`.
 
 ## Deployment
 
@@ -140,3 +161,7 @@ the branch. This means `articles.db` in the deployed container is only as
 fresh as the last successful push from this workflow, not continuously
 live; the container itself does not re-sync while running (see
 `docker-entrypoint.sh` above — sync only happens at container start).
+`.github/workflows/sync-vocab-cache.yml` runs the same loop 1h earlier
+(05:00 HKT / 21:00 UTC) for `sync_vocab.py`, so real-visitor-generated
+`vocab` rows also persist across redeploys instead of being wiped every
+time — see "English Corner (vocab generation)" above.

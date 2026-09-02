@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """FastAPI backend: JSON API backed by articles.db, plus a static mount
 for the built React frontend (frontend/dist, once it exists)."""
+import json
 import logging
 import os
 import time
@@ -66,6 +67,12 @@ class VocabTerm(BaseModel):
     example: str
 
 
+class VocabCacheRow(BaseModel):
+    nid: str
+    terms: list[VocabTerm]
+    generated_in_seconds: float | None = None
+
+
 @app.get("/api/articles", response_model=list[ArticleSummary])
 def get_articles(tag: str | None = None, year: str | None = None):
     conn = db.connect(DB_PATH)
@@ -117,7 +124,7 @@ def get_article_vocab(nid: str, response: Response):
         if article is None:
             raise HTTPException(status_code=404, detail="not found")
 
-        cached = db.get_vocab_cache(conn, nid)
+        cached = db.get_vocab(conn, nid)
         if cached is not None:
             terms, generated_in_seconds = cached
             logger.info("vocab nid=%s cache_hit latency=%.3fs", nid, time.monotonic() - start)
@@ -137,10 +144,33 @@ def get_article_vocab(nid: str, response: Response):
         elapsed = time.monotonic() - start
         logger.info("vocab nid=%s generated latency=%.3fs terms=%d", nid, elapsed, len(terms))
         response.headers["X-Vocab-Generated-In"] = f"{elapsed:.2f}"
-        db.save_vocab_cache(conn, nid, terms, elapsed)
+        db.save_vocab(conn, nid, terms, elapsed)
         return terms
     finally:
         conn.close()
+
+
+@app.get("/api/admin/vocab", response_model=list[VocabCacheRow])
+def export_vocab():
+    """Dump every cached vocab row, so the daily sync-vocab-cache GitHub
+    Action can pull real-visitor-triggered generations back into the
+    checked-in articles.db — otherwise they only live in the deployed
+    container's writable layer and get wiped on the next redeploy. Not
+    gated by ENGLISH_CORNER_ENABLED: existing rows should stay exportable
+    even if the feature is toggled off. No auth — this data (extracted
+    vocab from already-public articles) is already individually visible
+    via /api/article/{nid}/vocab; this just returns it in bulk."""
+    conn = db.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT article_nid, terms_json, generated_in_seconds FROM vocab"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {"nid": nid, "terms": json.loads(terms_json), "generated_in_seconds": generated_in_seconds}
+        for nid, terms_json, generated_in_seconds in rows
+    ]
 
 
 # Mounted last so it never shadows the /api/* routes above; only present
