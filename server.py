@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """FastAPI backend: JSON API backed by articles.db, plus a static mount
 for the built React frontend (frontend/dist, once it exists)."""
+import json
 import logging
 import os
 import time
@@ -64,6 +65,12 @@ class VocabTerm(BaseModel):
     ipa: str
     zh: str
     example: str
+
+
+class VocabCacheRow(BaseModel):
+    nid: str
+    terms: list[VocabTerm]
+    generated_in_seconds: float | None = None
 
 
 @app.get("/api/articles", response_model=list[ArticleSummary])
@@ -141,6 +148,29 @@ def get_article_vocab(nid: str, response: Response):
         return terms
     finally:
         conn.close()
+
+
+@app.get("/api/admin/vocab", response_model=list[VocabCacheRow])
+def export_vocab():
+    """Dump every cached vocab row, so the daily sync-vocab-cache GitHub
+    Action can pull real-visitor-triggered generations back into the
+    checked-in articles.db — otherwise they only live in the deployed
+    container's writable layer and get wiped on the next redeploy. Not
+    gated by ENGLISH_CORNER_ENABLED: existing rows should stay exportable
+    even if the feature is toggled off. No auth — this data (extracted
+    vocab from already-public articles) is already individually visible
+    via /api/article/{nid}/vocab; this just returns it in bulk."""
+    conn = db.connect(DB_PATH)
+    try:
+        rows = conn.execute(
+            "SELECT article_nid, terms_json, generated_in_seconds FROM vocab"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {"nid": nid, "terms": json.loads(terms_json), "generated_in_seconds": generated_in_seconds}
+        for nid, terms_json, generated_in_seconds in rows
+    ]
 
 
 # Mounted last so it never shadows the /api/* routes above; only present

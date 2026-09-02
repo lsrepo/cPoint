@@ -4,8 +4,11 @@ exactly once, cache-hit skips it, LLM failure surfaces as a 502, and the
 X-Vocab-Generated-In timing header is set on both a fresh generation and
 a later cache hit (persisted alongside the cached terms, so real
 visitors — who almost always hit a warm cache — still see how long the
-original generation took). vocab.generate_vocab is monkeypatched so this
-never hits the network."""
+original generation took). Also verifies /api/admin/vocab exports the
+same cached rows, and does so even with ENGLISH_CORNER_ENABLED off (the
+sync-vocab-cache pipeline should still be able to pull whatever's already
+cached regardless of the feature flag). vocab.generate_vocab is
+monkeypatched so this never hits the network."""
 import os
 import sys
 import tempfile
@@ -69,7 +72,31 @@ def main():
         res = client.get("/api/article/2/vocab")
         assert res.status_code == 502, res.json()
 
-        print("OK: /api/article/{nid}/vocab caches LLM output and surfaces failures as 502")
+        res = client.get("/api/admin/vocab")
+        assert res.status_code == 200
+        exported = res.json()
+        assert len(exported) == 1, exported
+        assert exported[0]["nid"] == "1" and exported[0]["terms"] == fake_terms, exported
+        assert isinstance(exported[0]["generated_in_seconds"], float), exported
+        assert round(exported[0]["generated_in_seconds"], 2) == float(first_timing), (
+            exported[0]["generated_in_seconds"], first_timing,
+        )
+
+        real_enabled = server.ENGLISH_CORNER_ENABLED
+        server.ENGLISH_CORNER_ENABLED = False
+        try:
+            assert client.get("/api/article/1/vocab").status_code == 404
+            res = client.get("/api/admin/vocab")
+            assert res.status_code == 200 and len(res.json()) == 1, (
+                "export should stay available even with the feature flag off"
+            )
+        finally:
+            server.ENGLISH_CORNER_ENABLED = real_enabled
+
+        print(
+            "OK: /api/article/{nid}/vocab caches LLM output and surfaces failures as 502; "
+            "/api/admin/vocab exports cached rows regardless of the feature flag"
+        )
     finally:
         vocab.generate_vocab = real_generate_vocab
         if os.path.exists(path):
