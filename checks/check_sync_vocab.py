@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Verify sync_vocab.sync() merges every exported row for an article that
 exists locally, and skips rows for articles that don't (yet) — using a
-fake in-memory export so this test needs no network access."""
+fake in-memory export so this test needs no network access. Also verifies
+fetch_export sends a non-default User-Agent: cpoint.paklau.com is
+Cloudflare-proxied, and Cloudflare's Bot Fight Mode blocklists urllib's
+default "Python-urllib/x.y" UA with a 403 — this killed the workflow's
+first scheduled run in production."""
 import os
 import sys
 import tempfile
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -68,6 +73,40 @@ def main():
         sync_vocab.fetch_export = real_fetch_export
         if os.path.exists(path):
             os.remove(path)
+
+    _check_fetch_export_user_agent()
+
+
+def _check_fetch_export_user_agent():
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b"[]"
+
+    captured = {}
+    real_urlopen = urllib.request.urlopen
+
+    def fake_urlopen(req, timeout=None):
+        captured["user_agent"] = req.get_header("User-agent")
+        return FakeResponse()
+
+    urllib.request.urlopen = fake_urlopen
+    try:
+        sync_vocab.fetch_export("http://fake-export-url")
+        assert captured.get("user_agent"), "must set an explicit User-Agent header"
+        assert "Python-urllib" not in captured["user_agent"], (
+            "must not use urllib's default UA — Cloudflare's Bot Fight Mode blocks it with a 403, "
+            "which is exactly what broke the first scheduled production run"
+        )
+    finally:
+        urllib.request.urlopen = real_urlopen
+
+    print("OK: sync_vocab.fetch_export sends a non-default User-Agent")
 
 
 if __name__ == "__main__":
