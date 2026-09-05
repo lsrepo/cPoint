@@ -94,6 +94,21 @@ def article_exists(conn, nid):
     return conn.execute("SELECT 1 FROM articles WHERE nid = ?", (nid,)).fetchone() is not None
 
 
+def set_tags(conn, nid, tag_names):
+    """Replace an article's tags without touching title/date/url/body —
+    unlike upsert_article, which is for the sync pipeline's full article
+    upsert. Used by the vocab-tag backfill script."""
+    conn.execute("DELETE FROM article_tags WHERE article_nid = ?", (nid,))
+    for tag in tag_names:
+        conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag,))
+        row = conn.execute("SELECT id FROM tags WHERE name = ?", (tag,)).fetchone()
+        conn.execute(
+            "INSERT OR IGNORE INTO article_tags (article_nid, tag_id) VALUES (?, ?)",
+            (nid, row[0]),
+        )
+    conn.commit()
+
+
 def _row_to_summary(row):
     nid, title, date, tags = row
     return {"nid": nid, "title": title, "date": date, "hashtags": tags.split(";") if tags else []}
