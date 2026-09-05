@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { getArticle } from "../api";
 import { nextParagraphIndex } from "../scrollNav";
-import CantoneseAudioPlayer from "./CantoneseAudioPlayer";
+import ArticleAudioPlayer from "./ArticleAudioPlayer";
 import EnglishCorner from "./EnglishCorner";
 
 export default function ArticleView() {
@@ -10,6 +10,7 @@ export default function ArticleView() {
   const location = useLocation();
   const backTo = location.state?.from || "/date";
   const isRandomMode = backTo === "/random";
+  const autoPlayAudio = location.state?.autoPlayAudio === true;
   const [article, setArticle] = useState(undefined);
   const [error, setError] = useState(null);
   const paragraphRefs = useRef([]);
@@ -52,7 +53,7 @@ export default function ArticleView() {
           <Link key={t} className="tag" to={`/tag/${encodeURIComponent(t)}`}>{t}</Link>
         ))}
       </p>
-      <CantoneseAudioPlayer body={article.body} />
+      <ArticleAudioPlayer nid={nid} autoPlay={autoPlayAudio} />
       <div className="article-body">
         {article.body.split("\n\n").map((para, i) => (
           <p key={i} ref={(el) => { paragraphRefs.current[i] = el; }}>{para}</p>

@@ -9,10 +9,12 @@ import time
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import db
+import tts
 import vocab
 
 load_dotenv()
@@ -148,6 +150,37 @@ def get_article_vocab(nid: str, response: Response):
         return terms
     finally:
         conn.close()
+
+
+@app.get("/api/article/{nid}/audio/{lang}")
+async def get_article_audio(nid: str, lang: str):
+    if lang not in tts.VOICES:
+        raise HTTPException(status_code=404, detail="unsupported lang")
+
+    path = tts.cache_path(nid, lang)
+    if os.path.exists(path):
+        return FileResponse(path, media_type="audio/mpeg")
+
+    conn = db.connect(DB_PATH)
+    try:
+        article = db.get_article(conn, nid)
+    finally:
+        conn.close()
+    if article is None:
+        raise HTTPException(status_code=404, detail="not found")
+
+    start = time.monotonic()
+    try:
+        await tts.synthesize_to_cache(nid, lang, article["body"])
+    except tts.TTSError as e:
+        logger.warning(
+            "tts nid=%s lang=%s generation_failed latency=%.3fs error=%s",
+            nid, lang, time.monotonic() - start, e,
+        )
+        raise HTTPException(status_code=502, detail=str(e)) from e
+
+    logger.info("tts nid=%s lang=%s generated latency=%.3fs", nid, lang, time.monotonic() - start)
+    return FileResponse(path, media_type="audio/mpeg")
 
 
 @app.get("/api/admin/vocab", response_model=list[VocabCacheRow])

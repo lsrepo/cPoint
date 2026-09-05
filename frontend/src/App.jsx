@@ -5,6 +5,7 @@ import DateView from "./components/DateView";
 import TagListView from "./components/TagListView";
 import TagFilteredView from "./components/TagFilteredView";
 import RandomView from "./components/RandomView";
+import LatestView from "./components/LatestView";
 import ArticleView from "./components/ArticleView";
 
 const THEME_KEY = "theme";
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="/tags" element={<TagListView />} />
           <Route path="/tag/:tag" element={<TagFilteredView />} />
           <Route path="/random" element={<RandomView />} />
+          <Route path="/latest" element={<LatestView />} />
           <Route path="/article/:nid" element={<ArticleView />} />
         </Routes>
       </main>

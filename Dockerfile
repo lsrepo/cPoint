@@ -10,10 +10,15 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
+# ffmpeg remuxes edge-tts's raw MP3 output (see tts.py) so <audio> seeking
+# works in the browser.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY db.py server.py sync_articles.py migrate_to_sqlite.py download_am730_column.py vocab.py ./
+COPY db.py server.py sync_articles.py migrate_to_sqlite.py download_am730_column.py vocab.py tts.py ./
 COPY articles.db ./
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 COPY docker-entrypoint.sh ./

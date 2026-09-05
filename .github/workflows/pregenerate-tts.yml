@@ -1,0 +1,21 @@
+name: Pre-generate TTS audio
+
+on:
+  schedule:
+    # 22:30 UTC = 06:30 HKT -- after the 22:00 UTC article sync, comfortably
+    # before 7:30am HKT visitors arrive.
+    - cron: "30 22 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Warm last 5 days of TTS audio on production
+        run: python3 pregenerate_audio.py
