@@ -159,7 +159,7 @@ async def get_article_audio(nid: str, lang: str):
 
     path = tts.cache_path(nid, lang)
     if os.path.exists(path):
-        return FileResponse(path, media_type="audio/mpeg")
+        return FileResponse(path, media_type="video/mp4")
 
     conn = db.connect(DB_PATH)
     try:
@@ -180,7 +180,7 @@ async def get_article_audio(nid: str, lang: str):
         raise HTTPException(status_code=502, detail=str(e)) from e
 
     logger.info("tts nid=%s lang=%s generated latency=%.3fs", nid, lang, time.monotonic() - start)
-    return FileResponse(path, media_type="audio/mpeg")
+    return FileResponse(path, media_type="video/mp4")
 
 
 @app.get("/api/admin/vocab", response_model=list[VocabCacheRow])

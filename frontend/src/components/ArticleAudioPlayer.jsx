@@ -15,6 +15,7 @@ function formatTime(seconds) {
 export default function ArticleAudioPlayer({ nid, autoPlay = false }) {
   const audioRef = useRef(null);
   const shouldPlayRef = useRef(autoPlay);
+  const userPausedRef = useRef(false);
   const [lang, setLang] = useState("cmn");
   const [status, setStatus] = useState("idle"); // idle | loading | playing | paused | error
   const [currentTime, setCurrentTime] = useState(0);
@@ -38,8 +39,25 @@ export default function ArticleAudioPlayer({ nid, autoPlay = false }) {
     if (!shouldPlayRef.current) return;
     shouldPlayRef.current = false;
     setStatus("loading");
+    // Chrome only ever grants "muted playback may autoplay with no user
+    // gesture" to elements with a video track -- confirmed empirically,
+    // including against the engine's own default policy for a fresh
+    // visitor with no engagement history (which is why the cached file
+    // is an MP4 with a minimal video track, not a bare audio file — see
+    // tts.py). Starting muted and immediately unmuting once playback has
+    // begun reliably produces real audible playback: unmuting an
+    // already-playing element doesn't itself require a gesture. This
+    // must be the FIRST play() attempt on the element, muted or not: a
+    // failed unmuted attempt poisons every later attempt (even muted
+    // ones) on that same element for a cooldown period, also confirmed
+    // empirically -- so never try unmuted first here.
+    audio.muted = true;
     audio.play()
-      .then(() => { setStatus("playing"); setBlocked(false); })
+      .then(() => {
+        setStatus("playing");
+        setBlocked(false);
+        audio.muted = false;
+      })
       .catch(() => setBlocked(true));
   }, [nid, lang]);
 
@@ -47,11 +65,13 @@ export default function ArticleAudioPlayer({ nid, autoPlay = false }) {
     const audio = audioRef.current;
     setBlocked(false);
     if (status === "playing") {
+      userPausedRef.current = true;
       audio.pause();
       setStatus("paused");
       return;
     }
     setStatus("loading");
+    audio.muted = false;
     audio.play().then(() => setStatus("playing")).catch(() => setStatus("error"));
   };
 
@@ -70,11 +90,29 @@ export default function ArticleAudioPlayer({ nid, autoPlay = false }) {
 
   return (
     <div className="audio-player">
-      <audio
+      {/* A <video> element, not <audio>: Chrome's autoplay policy only
+          ever exempts elements with a video track from needing a user
+          gesture before muted playback can start -- see tts.py and the
+          autoplay effect above. The cached file is an MP4 with a
+          minimal (2x2px) video track for exactly this reason. Visually
+          hidden rather than display:none, since some browsers throttle
+          or pause genuinely display:none media. */}
+      <video
         ref={audioRef}
         src={`/api/article/${nid}/audio/${lang}`}
         preload="none"
+        style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
         onPlaying={() => setStatus("playing")}
+        onPause={(e) => {
+          if (userPausedRef.current) { userPausedRef.current = false; return; }
+          if (e.currentTarget.ended) return; // natural end -- onEnded handles this
+          // Chrome silently paused this out from under us: it detected the
+          // muted-autoplay-then-unmute attempt above and reverted it because
+          // this visitor has never interacted with the site before. Surface
+          // the fallback button rather than leaving the UI claiming "playing".
+          setStatus("idle");
+          setBlocked(true);
+        }}
         onEnded={() => setStatus("idle")}
         onError={() => setStatus("error")}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
