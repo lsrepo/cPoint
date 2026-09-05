@@ -39,26 +39,39 @@ export default function ArticleAudioPlayer({ nid, autoPlay = false }) {
     if (!shouldPlayRef.current) return;
     shouldPlayRef.current = false;
     setStatus("loading");
-    // Chrome only ever grants "muted playback may autoplay with no user
-    // gesture" to elements with a video track -- confirmed empirically,
-    // including against the engine's own default policy for a fresh
-    // visitor with no engagement history (which is why the cached file
-    // is an MP4 with a minimal video track, not a bare audio file — see
-    // tts.py). Starting muted and immediately unmuting once playback has
-    // begun reliably produces real audible playback: unmuting an
-    // already-playing element doesn't itself require a gesture. This
-    // must be the FIRST play() attempt on the element, muted or not: a
-    // failed unmuted attempt poisons every later attempt (even muted
-    // ones) on that same element for a cooldown period, also confirmed
-    // empirically -- so never try unmuted first here.
-    audio.muted = true;
+    audio.muted = false;
     audio.play()
-      .then(() => {
-        setStatus("playing");
-        setBlocked(false);
-        audio.muted = false;
-      })
-      .catch(() => setBlocked(true));
+      .then(() => { setStatus("playing"); setBlocked(false); })
+      .catch(() => {
+        // The direct attempt above succeeds outright for a visitor Chrome
+        // already trusts to autoplay this site (real engagement history,
+        // or the visitor explicitly set Site settings > Sound > Allow) --
+        // no tricks needed. It fails for everyone else, where the best
+        // available fallback is: start muted (Chrome only ever grants
+        // "muted playback may autoplay with no gesture" to elements with
+        // a video track, confirmed empirically -- hence the cached file
+        // being an MP4 with a minimal video track, not bare audio; see
+        // tts.py), then unmute once playback has begun. That succeeds for
+        // nobody who hasn't already been granted the exemption above (
+        // Chrome detects the unmute and re-pauses, confirmed via its own
+        // console warning), so it's not a second chance at autoplay --
+        // it exists only so onPause below can reliably detect that and
+        // show the fallback play button, instead of the UI silently
+        // claiming "playing" while audio is actually paused. audio.load()
+        // resets the element so the failed unmuted attempt above doesn't
+        // poison this one (confirmed empirically: without it, a failed
+        // play() blocks every later attempt on that element, muted or
+        // not, for a cooldown period).
+        audio.load();
+        audio.muted = true;
+        audio.play()
+          .then(() => {
+            setStatus("playing");
+            setBlocked(false);
+            audio.muted = false;
+          })
+          .catch(() => setBlocked(true));
+      });
   }, [nid, lang]);
 
   const handleTogglePlay = () => {
