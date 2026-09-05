@@ -134,6 +134,35 @@ def _run_browser_checks():
         assert state["currentTime"] > 0, f"engaged visitor: expected progress, got {state}"
         print("OK: an engaged visitor gets fully automatic, audible playback on /latest")
 
+        # 3. The site must be a genuinely installable PWA: Chrome exempts an
+        # installed app from the gesture requirement entirely (see
+        # frontend/public/manifest.json and sw.js), which is the one way a
+        # visitor can get true zero-click audible autoplay on their very
+        # first-ever page load. Chrome's own installability check is the
+        # authority on whether this actually qualifies; this can't go
+        # further and simulate an actual install from here -- Chromium
+        # deliberately blocks automation from driving its install UI/OS app
+        # registration (confirmed: the PWA CDP domain isn't even present in
+        # this build), so the real "does an installed instance autoplay"
+        # step has to be verified by a human, once, in their own Chrome.
+        browser = p.chromium.launch()
+        context = browser.new_context()
+        page = context.new_page()
+        cdp = context.new_cdp_session(page)
+        page.goto(f"{BASE_URL}/")
+        page.wait_for_timeout(1500)
+        errors = cdp.send("Page.getInstallabilityErrors")["installabilityErrors"]
+        sw_state = page.evaluate(
+            """async () => {
+                const reg = await navigator.serviceWorker.getRegistration();
+                return reg?.active?.state;
+            }"""
+        )
+        browser.close()
+        assert errors == [], f"site does not qualify as an installable PWA: {errors}"
+        assert sw_state == "activated", f"service worker did not activate: {sw_state}"
+        print("OK: site is a genuinely installable PWA (zero installability errors, service worker active)")
+
 
 def main():
     import db
