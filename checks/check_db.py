@@ -94,6 +94,38 @@ def main():
         db.save_vocab(conn, "1", terms2, 1.2)
         assert db.get_vocab(conn, "1") == (terms2, 1.2)
 
+        # podcast_episodes: unpublished_articles_since ignores older articles
+        # and already-published nids; list is newest-first with article fields.
+        assert db.unpublished_articles_since(conn, "2025-03-01") == []
+        unpublished = db.unpublished_articles_since(conn, "2025-01-01")
+        assert [a["nid"] for a in unpublished] == ["2", "1"], unpublished
+        assert unpublished[0]["title"] == "Title B"
+        assert unpublished[0]["body"] == "Body B"
+
+        db.save_podcast_episode(
+            conn, "1",
+            guid="cpoint-yue-1",
+            media_url="https://audio.example/yue/1.m4a",
+            byte_length=1234,
+            duration_seconds=56,
+            published_at="2026-11-09T22:00:00Z",
+        )
+        assert db.get_podcast_episode(conn, "1")["byte_length"] == 1234
+        assert db.get_podcast_episode(conn, "2") is None
+        unpublished_after = db.unpublished_articles_since(conn, "2025-01-01")
+        assert [a["nid"] for a in unpublished_after] == ["2"], unpublished_after
+
+        episodes = db.list_podcast_episodes(conn)
+        assert [e["nid"] for e in episodes] == ["1"], episodes
+        assert episodes[0]["title"] == "Title A (edited)"
+        assert episodes[0]["guid"] == "cpoint-yue-1"
+        assert episodes[0]["media_url"] == "https://audio.example/yue/1.m4a"
+        assert episodes[0]["byte_length"] == 1234
+        assert episodes[0]["duration_seconds"] == 56
+
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "podcast_episodes" in tables, tables
+
         conn.close()
         print("OK: db.py schema and query helpers behave correctly")
     finally:

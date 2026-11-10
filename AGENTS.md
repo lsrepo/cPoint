@@ -16,13 +16,20 @@ rarely needed now that `articles.db` is checked in) and
 `sync_articles.py` (incremental — stops at the first article `nid` it
 already has) both reuse `download_am730_column.py`'s `post_page` /
 `fetch_article_text` / retry logic rather than re-implementing HTTP
-fetching.
+fetching. After a successful article sync, `sync_podcast.py` synthesizes
+Cantonese audio-only M4A for any article on/after `PODCAST_START_DATE`
+(2026-11-09) that isn't already in `podcast_episodes`, uploads it to R2,
+and records the enclosure metadata in `articles.db` so `/podcast.xml`
+can be served with no object-storage credentials on the web process.
+Historical articles are never backfilled.
 
 ## Conventions
 
 - **Data layer stays stdlib-only.** `db.py`, `migrate_to_sqlite.py`,
-  `sync_articles.py`, `download_am730_column.py` — no FastAPI/pydantic/etc
-  imports there. The framework boundary is deliberate, not an oversight.
+ `sync_articles.py`, `download_am730_column.py`, `podcast.py` — no
+ FastAPI/pydantic/boto3 imports there. `sync_podcast.py` / `r2.py` are
+ the exception that talks to R2, and they import `boto3` lazily so the
+ check scripts don't need it.
 - **Frontend stays framework-minimal.** React + `react-router-dom` only —
   no state-management library, no UI kit, no CSS framework. Theming is
   plain CSS custom properties (`frontend/src/index.css`, `:root` /
@@ -44,14 +51,17 @@ fetching.
   established.
 - **No pytest.** Tests are plain scripts under `checks/` — `main()` with
   bare `assert`s, printing `OK: ...` on success, non-zero exit on
-  failure. `check_db.py`/`check_migrate.py`/`check_sync.py` need only the
-  system Python (stdlib); `check_server.py` needs the venv active
-  (`source venv/bin/activate`) since it imports `server` → `fastapi`.
+  failure. `check_db.py`/`check_migrate.py`/`check_sync.py`/
+  `check_sync_vocab.py`/`check_podcast.py`/`check_sync_podcast.py` need
+  only the system Python (stdlib); `check_server.py` needs the venv
+  active (`source venv/bin/activate`) since it imports `server` →
+  `fastapi`.
 
 ## Before claiming something works
 
 - Run all: `python3 checks/check_db.py checks/check_migrate.py
-  checks/check_sync.py checks/check_sync_vocab.py` and (venv active)
+  checks/check_sync.py checks/check_sync_vocab.py checks/check_podcast.py
+  checks/check_sync_podcast.py` and (venv active)
   `checks/check_server.py checks/check_vocab.py
   checks/check_vocab_request.py checks/check_server_vocab.py`.
 - `cd frontend && npm run lint` — expect exactly 7 warnings, all
@@ -147,13 +157,47 @@ pattern, not what the table actually is.)
   which already sets a browser UA for the unrelated reason of not getting
   blocked by the *source* am730 site), it needs the same treatment.
 
+## Cantonese podcast (RSS)
+
+Forward-only Cantonese read-aloud of new columns, for Apple Podcasts
+(Follow a Show by URL, or submit the same feed in Podcasts Connect).
+Enclosures are audio-only AAC M4A on R2 — not the dummy-video MP4 the
+on-site player caches in `tts_cache/` (that format is a Chrome autoplay
+workaround and would be a video podcast as far as Apple is concerned).
+
+- **No historical backfill.** `sync_podcast.py` only considers articles
+  with `date >= PODCAST_START_DATE` (default `2026-11-09`) that aren't
+  already in `podcast_episodes`. Running it against the full archive
+  does not dump 2011–2026 into R2.
+- **`articles.db` holds enclosure metadata, R2 holds the bytes.** Same
+  commit-and-push pattern as new articles: the GitHub Action writes
+  `podcast_episodes` rows into the checked-in DB. `/podcast.xml` is a
+  pure SQL → XML route — production does not need R2 credentials just
+  to serve the feed. Running `sync_podcast.py` locally against the real
+  `articles.db` will leave a `git diff` on that file; `git checkout --
+  articles.db` before committing if those rows weren't meant to land.
+- **R2 credentials live in GitHub Actions secrets** (`R2_ACCOUNT_ID`,
+  `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`,
+  `PODCAST_MEDIA_BASE_URL`), not in this repo. If they're unset the
+  workflow skips podcast publish and still commits new articles. The
+  same skip happens in `docker-entrypoint.sh`, which runs
+  `sync_podcast.py` after `sync_articles.py` so a container that *does*
+  have R2 env vars can catch up if the Action didn't.
+- **Apple's crawler vs Bot Fight Mode.** The feed and cover are on
+  `cpoint.paklau.com` (Cloudflare-proxied). If Connect or the Podcasts
+  app 403s `/podcast.xml`, allowlist `iTunes` / `AppleCoreMedia` (or the
+  `/podcast.xml` and `/podcast-cover.jpg` paths) the same way urllib's
+  default UA had to be avoided for vocab sync. Enclosure GETs go to the
+  R2 custom domain, not the app origin.
+
 ## Deployment
 
 `Dockerfile` bakes `articles.db` into the image at build time (`COPY
 articles.db .` — it must exist in the build context, which it does since
 it's checked in). `docker-entrypoint.sh` backgrounds `sync_articles.py`
-(catches up on anything published since the image was built) and `exec`s
-`server.py` as the foreground process. `server.py`'s bind host reads a
+then `sync_podcast.py` (catch up on articles published since the image
+was built, then publish any new post-cutoff Cantonese episodes if R2
+env vars are present) and `exec`s `server.py` as the foreground process. `server.py`'s bind host reads a
 `HOST` env var (default `127.0.0.1` for local/dev; the entrypoint sets
 `HOST=0.0.0.0` since Docker's port mapping can't reach a loopback-only
 bind). Port is 8420 everywhere in this project (not the more common 8000
@@ -162,9 +206,11 @@ development; no need to reconcile if you see 8000 in a generic
 FastAPI/Vite example elsewhere).
 
 **Daily sync → redeploy loop.** `.github/workflows/sync-articles.yml` runs
-`sync_articles.py` on a schedule (06:00 HKT / 22:00 UTC cron, plus
-`workflow_dispatch` for manual runs) and, only if `articles.db` actually
-changed, commits and pushes it to `main` as `github-actions[bot]`. The
+`sync_articles.py` then `sync_podcast.py` on a schedule (06:00 HKT /
+22:00 UTC cron, plus `workflow_dispatch` for manual runs) and, only if
+`articles.db` actually changed (new articles and/or new
+`podcast_episodes` rows), commits and pushes it to `main` as
+`github-actions[bot]`. The
 live deployment is on Dokploy with GitOps watching `main`, so that push is
 what triggers the rebuild + redeploy — there's no separate deploy step or
 webhook configured in this repo, Dokploy does it on its own by watching

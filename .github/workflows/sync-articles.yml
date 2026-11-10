@@ -22,6 +22,24 @@ jobs:
       - name: Run incremental sync
         run: python3 sync_articles.py
 
+      - name: Publish new Cantonese podcast episodes
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          PODCAST_MEDIA_BASE_URL: ${{ secrets.PODCAST_MEDIA_BASE_URL }}
+          PODCAST_START_DATE: "2026-11-09"
+        run: |
+          if [ -z "$R2_ACCESS_KEY_ID" ]; then
+            echo "Skipping podcast sync: R2 credentials not set"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install -r requirements.txt
+          python3 sync_podcast.py
+
       - name: Commit and push if articles.db changed
         run: |
           if git diff --quiet -- articles.db; then

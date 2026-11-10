@@ -22,6 +22,7 @@ muted at first, unmuting immediately once playback has actually begun
 -- see ArticleAudioPlayer.jsx."""
 import asyncio
 import os
+import subprocess
 
 import edge_tts
 
@@ -97,3 +98,60 @@ async def synthesize_to_cache(nid, lang, text):
             os.remove(tmp_path)
 
     return final_path
+
+
+async def synthesize_audio_m4a(text, lang, dest_path):
+    """Synthesize text to an audio-only AAC M4A at dest_path (no video
+    track — Apple Podcasts RSS enclosures must be audio/mp4 or
+    audio/mpeg, not the dummy-video MP4 the on-site player uses).
+    Returns duration in whole seconds."""
+    raw = await _collect_raw(text, lang)
+    os.makedirs(os.path.dirname(dest_path) or ".", exist_ok=True)
+    tmp_path = f"{dest_path}.tmp"
+    try:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-f", "mp3", "-i", "pipe:0",
+                "-c:a", "aac", "-b:a", "64k", "-ac", "1",
+                "-movflags", "+faststart",
+                "-f", "mp4",
+                tmp_path,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError as e:
+            raise TTSError("ffmpeg is required to package TTS audio but is not installed") from e
+
+        _, stderr = await proc.communicate(raw)
+        if proc.returncode != 0:
+            raise TTSError(f"ffmpeg muxing failed: {stderr.decode(errors='replace')}")
+
+        os.replace(tmp_path, dest_path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+    return probe_duration_seconds(dest_path)
+
+
+def probe_duration_seconds(path):
+    proc = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "csv=p=0",
+            path,
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise TTSError(f"ffprobe failed: {proc.stderr.decode(errors='replace')}")
+    raw = proc.stdout.decode().strip()
+    try:
+        seconds = int(round(float(raw)))
+    except ValueError as e:
+        raise TTSError(f"ffprobe returned non-numeric duration {raw!r}") from e
+    return max(seconds, 1)

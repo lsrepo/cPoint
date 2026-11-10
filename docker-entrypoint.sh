@@ -5,6 +5,14 @@ set -e
 # background so it never delays the server becoming reachable; it stops
 # as soon as it reaches an article already in articles.db, so this is
 # fast even when there's little or nothing new.
-python3 sync_articles.py &
+# Catch up on articles published since the image was built, then publish
+# any new post-cutoff Cantonese episodes to R2. Backgrounded so neither
+# step delays the server becoming reachable. sync_podcast.py no-ops when
+# R2 credentials aren't in the environment (the GitHub Action is the
+# primary publisher).
+(
+  python3 sync_articles.py
+  python3 sync_podcast.py
+) &
 
 exec python3 server.py

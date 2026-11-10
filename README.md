@@ -23,6 +23,10 @@ backend, React frontend.
 - **Incremental daily updates** — `sync_articles.py` fetches only articles
   published since the last sync (stops at the first one it already has),
   so keeping the archive current never means re-fetching everything.
+- **Cantonese podcast** — a public RSS feed of new columns read aloud in
+  Cantonese (`/podcast.xml`), importable in Apple Podcasts. Historical
+  articles are not backfilled; each newly synced article becomes one
+  episode.
 - **One-command Docker deployment** — see below; the container runs the
   same incremental sync in the background on startup.
 
@@ -90,10 +94,40 @@ no restart needed.
 **Automated daily sync.** [`.github/workflows/sync-articles.yml`](.github/workflows/sync-articles.yml)
 runs the same script on a schedule (06:00 HKT daily, plus a manual
 `workflow_dispatch` trigger), and commits + pushes `articles.db` to `main`
-if it found anything new. The deployed instance is on Dokploy with GitOps
-enabled watching `main`, so a push from this workflow automatically
-triggers a rebuild + redeploy there — the full loop (scrape → commit →
-redeploy) runs unattended every morning with no manual step.
+if it found anything new (articles and/or podcast episode rows). The
+deployed instance is on Dokploy with GitOps enabled watching `main`, so a
+push from this workflow automatically triggers a rebuild + redeploy there
+— the full loop (scrape → commit → redeploy) runs unattended every
+morning with no manual step.
+
+## Podcast (Apple Podcasts)
+
+Feed URL: <https://cpoint.paklau.com/podcast.xml>
+
+In Apple Podcasts: Library → Follow a Show by URL, paste that link.
+Cover art is served at `/podcast-cover.jpg`. Cantonese only; episodes
+start from 2026-11-09 and only accrue when `sync_articles.py` picks up a
+new column.
+
+Audio files are stored on Cloudflare R2 (audio-only AAC M4A). The daily
+article-sync workflow publishes them. Set these GitHub Actions secrets
+before the first episode will appear:
+
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET`
+- `PODCAST_MEDIA_BASE_URL` — public origin for objects, e.g.
+  `https://audio.cpoint.paklau.com` (R2 custom domain on the bucket).
+  Object keys are `yue/{nid}.m4a`.
+
+The feed owner email defaults to `radishlau@gmail.com` (`PODCAST_OWNER_EMAIL`
+overrides it). Optional: `SITE_URL` (defaults to `https://cpoint.paklau.com`).
+
+If Cloudflare Bot Fight Mode is on for `cpoint.paklau.com`, allow
+Apple's crawler (`iTunes`, `AppleCoreMedia`) or the `/podcast.xml` and
+`/podcast-cover.jpg` paths — the same class of 403 that previously hit
+`Python-urllib` on the vocab sync.
 
 ## Development mode
 
@@ -110,6 +144,6 @@ cd frontend
 npm run dev
 ```
 
-Open <http://localhost:5173/> — Vite proxies `/api/*` requests to the
-backend on port 8420. Re-run `npm run build` (Step 2 above) when you're
+Open <http://localhost:5173/> — Vite proxies `/api/*`, `/podcast.xml`,
+and `/podcast-cover.jpg` to the backend on port 8420. Re-run `npm run build` (Step 2 above) when you're
 done, so `python3 server.py` alone serves the latest frontend again.

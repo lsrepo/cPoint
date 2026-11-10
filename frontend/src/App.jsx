@@ -60,7 +60,10 @@ export default function App() {
           <Link to="/date">「C觀點」文章庫</Link>
         </h1>
         <NavToggle />
-        <ThemeToggle />
+        <div className="header-actions">
+          <a className="podcast-link" href="/podcast.xml">Podcast</a>
+          <ThemeToggle />
+        </div>
       </header>
       <main>
         <Routes>

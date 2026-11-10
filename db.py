@@ -29,6 +29,14 @@ CREATE TABLE IF NOT EXISTS vocab (
     terms_json TEXT NOT NULL,
     generated_in_seconds REAL
 );
+CREATE TABLE IF NOT EXISTS podcast_episodes (
+    article_nid TEXT PRIMARY KEY REFERENCES articles(nid),
+    guid TEXT NOT NULL UNIQUE,
+    media_url TEXT NOT NULL,
+    byte_length INTEGER NOT NULL,
+    duration_seconds INTEGER NOT NULL,
+    published_at TEXT NOT NULL
+);
 """
 
 TAGS_SUBQUERY = """
@@ -210,3 +218,74 @@ def save_vocab(conn, nid, terms, generated_in_seconds):
         (nid, json.dumps(terms, ensure_ascii=False), generated_in_seconds),
     )
     conn.commit()
+
+
+def save_podcast_episode(conn, nid, *, guid, media_url, byte_length, duration_seconds, published_at):
+    conn.execute(
+        "INSERT INTO podcast_episodes "
+        "(article_nid, guid, media_url, byte_length, duration_seconds, published_at) "
+        "VALUES (?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(article_nid) DO UPDATE SET "
+        "guid = excluded.guid, media_url = excluded.media_url, "
+        "byte_length = excluded.byte_length, duration_seconds = excluded.duration_seconds, "
+        "published_at = excluded.published_at",
+        (nid, guid, media_url, byte_length, duration_seconds, published_at),
+    )
+    conn.commit()
+
+
+def get_podcast_episode(conn, nid):
+    row = conn.execute(
+        "SELECT article_nid, guid, media_url, byte_length, duration_seconds, published_at "
+        "FROM podcast_episodes WHERE article_nid = ?",
+        (nid,),
+    ).fetchone()
+    if row is None:
+        return None
+    article_nid, guid, media_url, byte_length, duration_seconds, published_at = row
+    return {
+        "nid": article_nid,
+        "guid": guid,
+        "media_url": media_url,
+        "byte_length": byte_length,
+        "duration_seconds": duration_seconds,
+        "published_at": published_at,
+    }
+
+
+def unpublished_articles_since(conn, since_date):
+    rows = conn.execute(
+        "SELECT a.nid, a.title, a.date, a.body FROM articles a "
+        "LEFT JOIN podcast_episodes p ON p.article_nid = a.nid "
+        "WHERE p.article_nid IS NULL AND a.date >= ? "
+        "ORDER BY a.date DESC, a.nid DESC",
+        (since_date,),
+    ).fetchall()
+    return [
+        {"nid": nid, "title": title, "date": date, "body": body}
+        for nid, title, date, body in rows
+    ]
+
+
+def list_podcast_episodes(conn):
+    rows = conn.execute(
+        "SELECT a.nid, a.title, a.date, a.body, a.url, "
+        "p.guid, p.media_url, p.byte_length, p.duration_seconds, p.published_at "
+        "FROM podcast_episodes p JOIN articles a ON a.nid = p.article_nid "
+        "ORDER BY a.date DESC, a.nid DESC"
+    ).fetchall()
+    return [
+        {
+            "nid": nid,
+            "title": title,
+            "date": date,
+            "body": body,
+            "url": url,
+            "guid": guid,
+            "media_url": media_url,
+            "byte_length": byte_length,
+            "duration_seconds": duration_seconds,
+            "published_at": published_at,
+        }
+        for nid, title, date, body, url, guid, media_url, byte_length, duration_seconds, published_at in rows
+    ]

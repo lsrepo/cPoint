@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import db
+import podcast
 import tts
 import vocab
 
@@ -23,6 +24,9 @@ logger = logging.getLogger("uvicorn.error")
 
 DB_PATH = db.DB_PATH
 FRONTEND_DIST = os.path.join("frontend", "dist")
+COVER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "podcast-cover.jpg")
+SITE_URL = os.environ.get("SITE_URL", "https://cpoint.paklau.com")
+PODCAST_OWNER_EMAIL = os.environ.get("PODCAST_OWNER_EMAIL", "radishlau@gmail.com")
 ENGLISH_CORNER_ENABLED = os.environ.get("ENGLISH_CORNER_ENABLED", "true").lower() not in ("false", "0", "")
 
 app = FastAPI(title="施永青「C觀點」文章庫 API")
@@ -30,7 +34,7 @@ app = FastAPI(title="施永青「C觀點」文章庫 API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],  # Vite dev server
-    allow_methods=["GET"],
+    allow_methods=["GET", "HEAD"],
     allow_headers=["*"],
     expose_headers=["X-Vocab-Generated-In"],
 )
@@ -181,6 +185,35 @@ async def get_article_audio(nid: str, lang: str):
 
     logger.info("tts nid=%s lang=%s generated latency=%.3fs", nid, lang, time.monotonic() - start)
     return FileResponse(path, media_type="video/mp4")
+
+
+@app.api_route("/podcast.xml", methods=["GET", "HEAD"])
+def get_podcast_feed():
+    """Public Cantonese podcast RSS. Enclosure files live on R2; this
+    route only serializes podcast_episodes rows already committed to
+    articles.db. Empty feed (zero items) is valid XML so the URL can
+    exist before the first post-cutoff article is published."""
+    conn = db.connect(DB_PATH)
+    try:
+        episodes = db.list_podcast_episodes(conn)
+    finally:
+        conn.close()
+    site = SITE_URL.rstrip("/")
+    xml = podcast.rss_xml(
+        episodes,
+        site_url=site,
+        feed_url=f"{site}/podcast.xml",
+        cover_url=f"{site}/podcast-cover.jpg",
+        owner_email=PODCAST_OWNER_EMAIL,
+    )
+    return Response(content=xml, media_type="application/rss+xml; charset=utf-8")
+
+
+@app.api_route("/podcast-cover.jpg", methods=["GET", "HEAD"])
+def get_podcast_cover():
+    if not os.path.isfile(COVER_PATH):
+        raise HTTPException(status_code=404, detail="cover not found")
+    return FileResponse(COVER_PATH, media_type="image/jpeg")
 
 
 @app.get("/api/admin/vocab", response_model=list[VocabCacheRow])

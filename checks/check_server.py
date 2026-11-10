@@ -4,6 +4,7 @@ using FastAPI's TestClient (in-process, no real socket or process needed)."""
 import os
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -77,6 +78,45 @@ def main():
 
         res = client.get("/api/article/999")
         assert res.status_code == 404
+
+        server.SITE_URL = "https://cpoint.paklau.com"
+        server.PODCAST_OWNER_EMAIL = "pak@example.com"
+        res = client.get("/podcast.xml")
+        assert res.status_code == 200, res.text
+        assert "xml" in res.headers["content-type"]
+        feed = ET.fromstring(res.text)
+        assert feed.find("channel").findall("item") == []
+
+        conn = db.connect(path)
+        db.save_podcast_episode(
+            conn, "1",
+            guid="cpoint-yue-1",
+            media_url="https://audio.example/yue/1.m4a",
+            byte_length=4242,
+            duration_seconds=33,
+            published_at="2026-11-09T22:00:00Z",
+        )
+        conn.close()
+        res = client.get("/podcast.xml")
+        assert res.status_code == 200
+        items = ET.fromstring(res.text).find("channel").findall("item")
+        assert len(items) == 1
+        assert items[0].find("enclosure").attrib["url"] == "https://audio.example/yue/1.m4a"
+        assert items[0].find("enclosure").attrib["length"] == "4242"
+        assert items[0].find("guid").text == "cpoint-yue-1"
+
+        res = client.get("/podcast-cover.jpg")
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("image/jpeg")
+        assert len(res.content) > 1000
+
+        # Apple Podcasts crawls with HEAD + Range; GET-only routes 405.
+        res = client.head("/podcast.xml")
+        assert res.status_code == 200, res.text
+        assert "xml" in res.headers["content-type"]
+        res = client.head("/podcast-cover.jpg")
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("image/jpeg")
 
         print("OK: FastAPI routes serve the JSON API correctly")
     finally:

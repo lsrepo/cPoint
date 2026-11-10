@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY db.py server.py sync_articles.py migrate_to_sqlite.py download_am730_column.py vocab.py tts.py ./
-COPY articles.db ./
+COPY db.py server.py sync_articles.py migrate_to_sqlite.py download_am730_column.py vocab.py tts.py podcast.py sync_podcast.py r2.py ./
+COPY articles.db podcast-cover.jpg ./
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh

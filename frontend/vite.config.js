@@ -6,6 +6,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:8420',
+      '/podcast.xml': 'http://localhost:8420',
+      '/podcast-cover.jpg': 'http://localhost:8420',
     },
   },
 })
