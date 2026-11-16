@@ -3,7 +3,7 @@ name: Sync articles
 on:
   schedule:
     # 22:00 UTC = 06:00 HKT (UTC+8, no DST)
-    - cron: "* 22 * * *"
+    - cron: "23 22 * * *"
   workflow_dispatch: {}
 
 permissions:
