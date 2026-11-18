@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cpoint-sync-tick",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-18",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": {
+    "crons": ["0 22 * * *"]
+  }
+}

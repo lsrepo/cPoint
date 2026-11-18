@@ -1,9 +1,8 @@
 name: Sync articles
 
 on:
-  schedule:
-    # 22:00 UTC = 06:00 HKT (UTC+8, no DST)
-    - cron: "23 22 * * *"
+  # 06:00 HKT is fired by the cpoint-sync-tick Worker (22:00 UTC),
+  # which dispatches this workflow. GitHub's own schedule starts late.
   workflow_dispatch: {}
 
 permissions:
